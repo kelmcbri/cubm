@@ -130,25 +130,15 @@ proc act_Setup { } {
     init_perCallVars
     infotag set med_language 1
 
-    if { ($dnis == "") || ($dnis == $aaPilot) } {
         leg setupack leg_incoming
     	leg proceeding leg_incoming
     	leg connect leg_incoming
         set legConnected true
-		  
-
-	puts "\nNo DNIS\n"
-        set param1(dialPlan) true
-        leg collectdigits leg_incoming param1
-        media play leg_incoming _get_maid_id.au
-    } else {
-        set fcnt 6
-	leg setupack leg_incoming
-        handoff callappl leg_incoming default "DESTINATION=$dnis"
-        fsm setstate HANDOFF
-    } 
-
-
+	    puts "\nCall Recieved, collecting Maid ID\n"
+        set param1(maxDigits) 4 
+        media play leg_incoming en_get_maid_id.au
+		leg collectdigits leg_incoming param1
+        fsm setstate any_state
 }
 proc act_GotDest { } {
     global dest
@@ -183,39 +173,6 @@ proc act_GotDest { } {
     }
 	puts "\nThe destination digits entered were $dest\n"
 }
-proc act_CallSetupDone { } {
-    global busyPrompt
-    global legConnected 
-
-    set status [infotag get evt_handoff_string]
-    if { [string length $status] != 0} {
-        regexp {([0-9][0-9][0-9])} $status StatusCode
-        puts "IP IVR Disconnect Status = $status" 
-        switch $StatusCode {
-          "016" {
-              puts "\n Connection success"
-              fsm setstate CONTINUE
-              act_Cleanup 
-          }
-          default {
-              if { $legConnected == "false" } {
-                  leg proceeding leg_incoming  
-                  leg connect leg_incoming  
-                  set legConnected true 
-              }
-              puts "\n Call failed.  Play prompt and collect digit"
-              if { ($StatusCode == "017") } {
-                  set busyPrompt _dest_busy.au
-              } 
-              act_Select
-          }
-        } 
-    } else {
-        puts "\n Caller disconnected" 
-        fsm setstate CALLDISCONNECT 
-        act_Cleanup 
-    }
-}
 proc act_Select { } {
     global destination
     global promptFlag2
@@ -238,7 +195,7 @@ proc act_Select { } {
     if { $fcnt < $retrycnt } {
     	media play leg_incoming $busyPrompt %s500 _reenter_dest.au
 	incr fcnt
-    	fsm setstate GETROOM
+    	fsm setstate same_state
     } else {
 	act_DestBusy
     }
@@ -273,9 +230,8 @@ init_ConfigVars
 #   State Machine
 #----------------------------------
   set fsm(any_state,ev_disconnected)   		"act_Cleanup  same_state"
-  set fsm(CALL_INIT,ev_setup_indication) 	"act_Setup  GETROOM"
-  set fsm(GETROOM,ev_collectdigits_done) 	"act_GotDest HANDOFF"
-  set fsm(HANDOFF,ev_returned)   			"act_CallSetupDone  CONTINUE"
+  set fsm(CALL_INIT,ev_setup_indication) 	"act_Setup  GETMAIDID"
+  set fsm(GETMAIDID,ev_collectdigits_done) 	"act_GotDest CONTINUE"
   set fsm(CALLDISCONNECT,ev_media_done) 	"act_Cleanup  same_state"
 
   fsm define fsm CALL_INIT

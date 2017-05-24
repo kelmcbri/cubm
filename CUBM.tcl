@@ -1,9 +1,8 @@
-# Script Version: 1.1
+# Script Version: 1.2
 # Script Name: CUBM
-#------------------------------------------------------------------
-# September 9, 2009 , Keller McBride kelmcbri@cisco.com
-#
-#------------------------------------------------------------------
+#-------------------------------------------------------------------------
+# Originally Created September 9, 2009 , Keller McBride kelmcbri@cisco.com
+#-------------------------------------------------------------------------
 #
 # Description: 
 # This is a TCL script to create a Bed Management interface between
@@ -11,46 +10,57 @@
 # This program communicates to Meditech via the Cloverleaf application
 # The program uses a protocol specified by Cloverleaf over a TCP connection.
 #
-# INBOUND DATA TO CLOVERLEAF FROM  PBX
-# Data Format – ASCII text file
+# INBOUND DATA TO CLOVERLEAF FROM  Router
+# Data Format ASCII text
 # Data Example:
 #        Room Status Change:
 #
-#        ?ST    8099 PR MI    7896?
+#        ?ST    8099 PR MI    7896 DS 2012:05:12 13:01:02?
 #
-#PROCESS RULES:
+#Cloverleaf PROCESS RULES:
 #1.	ROOM STATUS
-#CL - CLean
-#PR -Cleaning in PRogress
+#           CL - CLean
+#           PR - Cleaning in PRogress
 #
 #Any additional room status sent by PBX should be ignored.
 #
 #2.	MAID ID 
-#If no Maid ID is entered, PBX will send a “0” in the Maid Id field.
-#
+#If no Maid ID is entered, PBX will send a 9999 in the Maid Id field.
 #
 #Data Layout from  PBX 
-#Position	Field Name 	Value	Data type
-#X = Alphanumeric
-#9 = Numeric	Notes
-#0	Beginning Character	Start Character	 (02HEX)	 
-#1-2	STATUS	ST  (hard coded)	XX	Denote Status message 
-#
-#3	Space	 	 	 
-#4-5-6-7-8-9-10	Room Number	8099 (valid room number)	XXXXXXX	1-7 digits #right justified
-#11	Space	 	 	 
-#12-13	Room Status	PR (or CL)	XX	CL=cleaned; PR=cleaning in progress
-#14	Space	 	 	 
-#15-16	Denotes MAID ID to follow 	MI (hard coded)	XX	Denotes Maid Id #will follow
-#17-18-19-20	Space	 	 	 
-#21-22-23-24	Value for Maid Id	7896 (valid maid id)	XXXX	Can be #1-4 digits right justified.  Not required.  If no maid id entered, #Cloverleaf will pad with generic id 9999 
-# 25	Ending Character	End Character	 	(03HEX) 
-#
-#
+#Position		Field Name 		Value			Data type
+# 1 			Beginning Character 	StartCharacter 		(02Hex)
+# 2-3 			STATUS ST 		ST (hardcoded)		Denote Status message
+# 4 			Space
+# 5-6-7-8-9-10-11 	Room Number 		XXXXXXX 		1-7 digits right justified
+# 12 			Space
+# 13-14 		Room Status 		PR or CL 		CL=cleaned; PR=cleaning in progress
+# 15 			Space
+# 16-17 		MaidID to Follow 	MI 			Denotes Maid Id will follow
+# 18 			Space
+# 19-20-21-22 		Value for Maid Id 	XXXX 			Can be 1?4 digits right justified. Not required. If no maid id entered, Cloverleaf will pad with generic id 9999
+# 23 			Space
+# 24-25 		TimeStamp to Follow 	DS 			DS Denotes Date/TimeStamp to Follow
+# 26 			Space
+# 27-28-29-30 		Year 			XXXX CCYY 		Date/Time stamp Year
+# 31 			Space
+# 32-33 		Month 			XX 			MM Date/Time stamp month
+# 34 			Separator		: 			
+# 35-36 		Hour 			XX 			HH (valid time hour in 24 hr format)
+# 37 			Separator 		:
+# 38-39 		Minutes 		XX 			MM(Valid time minutes)
+# 40 			Separator		:
+# 41-42 		Seconds 		XX 			SS Date/Time Stamp Seconds
+# 43 			Ending Character 				End Character (03 Hex)
 #
 #-------------------------------------------------------------------
 # Version 1.1 fixes
 # changed printf function in sendCloverleaf procedure to accept leading 0s for room number and maidID
+#
+# Version 1.2 Changes
+#    "debug voice application scripts"  will now print embedded help messages to router console as program runs
+#    Added a catch in cubm-eem.tcl to print error message to router console if tcp connection to Cloverleaf failed.
+#    NEW TIMESTAMP ADDED TO PACKET SENT TO CLOVERLEAF - positions 25-32 inserted
 #
 proc init { } {
     global digit_collect_params
@@ -68,23 +78,25 @@ proc init { } {
     set legConnected false
 
     param register aa-pilot "CUBM pilot number" "234" "s"
-	param register aa-pilot2 "CUMB pilot number ask room" "235" "s"
+    param register aa-pilot2 "CUMB pilot number ask room" "235" "s"
     param register cloverleaf-ip "IP Address of Cloverleaf server" "127.0.0.1" "s"
     param register cloverleaf-port "Port number to access Cloverleaf server" "12345" "i"
     param register maid-id-pattern "Pattern to use to match maid ID" "...." "s"
     param register room-num-pattern "Pattern to use to match room number" "....." "s"
+    param register local-Timezone "Local Timezone" "cst" "s"
 }
 
 proc init_ConfigVars { } {
     global destination
     global aaPilot
-	global aaPilot2
+    global aaPilot2
     global oprtr
 
     global cloverleafIP
     global cloverleafPort
     global maidIDPattern
     global roomNumPattern
+    global localTimezone
 
 # aa-pilot is the IVR number configured on the gateway - will use ANI as room number
 # aa-pilot2 is the IVR number configured on the gateway - will ask for room number
@@ -96,16 +108,17 @@ proc init_ConfigVars { } {
     set cloverleafPort [string trim [infotag get cfg_avpair cloverleaf-port]]
     set maidIDPattern [string trim [infotag get cfg_avpair maid-id-pattern]]
     set roomNumPattern [string trim [infotag get cfg_avpair room-num-pattern]]
+    set localTimezone [string trim [infotag get cfg_avpair local-Timezone]]
 }
 
 proc init_perCallVars { } {
-    puts "\nproc init_perCallvars"
+    puts "        Entering procedure init_perCallvars"
     global ani
     global digit_enabled
     global fcnt
     global retrycnt
     global dnis
-	global useAniAsRoom
+    global useAniAsRoom
 
     set fcnt 0
     set retrycnt 6
@@ -114,9 +127,9 @@ proc init_perCallVars { } {
 
     set digit_enabled "FALSE"
     set ani [infotag get leg_ani]
-    puts "\nANI $ani"
+    puts "        The Calling ANI is: $ani"
     set dnis [infotag get leg_dnis]
-    puts "\nDNIS $dnis"
+    puts "        The called number DNIS is: $dnis"
 
 }
 
@@ -135,7 +148,7 @@ proc act_Setup { } {
     global legConnected
     global useAniAsRoom
 
-    puts "\n\nproc act_Setup\n\n"
+    puts "        Entering procedure act_Setup"
     set busyPrompt _dest_unreachable.au
     set beep 0
     init_perCallVars
@@ -146,7 +159,7 @@ proc act_Setup { } {
     	leg proceeding leg_incoming
     	leg connect leg_incoming
         set legConnected true
-        puts "\nMatch No DNIS or DNIS is aaPilot2\n"
+        puts "        Match No DNIS or DNIS is aaPilot2"
 		set useAniAsRoom false
         fsm setstate PLAYMAIDID
         act_PlayMaidID
@@ -156,7 +169,7 @@ proc act_Setup { } {
     	leg connect leg_incoming
         set legConnected true
 		set useAniAsRoom true
-        puts "\nMatch DNIS is aaPilot\n"
+        puts "        The Dailed number DNIS matched aaPilot: $aaPilot"
         fsm setstate PLAYMAIDID
         act_PlayMaidID
 	} else {
@@ -172,7 +185,7 @@ proc act_GotDest { } {
     global callInfo
     global oprtr
     global busyPrompt
-    puts "\n proc act_GotDest"
+    puts "        Entering procedure act_GotDest"
     set status [infotag get evt_status]
     set callInfo(alertTime) 30
 
@@ -189,7 +202,7 @@ proc act_GotDest { } {
 	if { $status == "cd_006" } {
 		set busyPrompt _dest_unreachable.au
 	}
-        puts "\nCall [infotag get con_all] got event $status collecting destination"
+        puts "        Call [infotag get con_all] got event $status collecting destination"
 	set dest [infotag get evt_dcdigits]
 	if { $dest == "0" } {
 		set dest $oprtr
@@ -198,7 +211,7 @@ proc act_GotDest { } {
         	act_Select
 	}
     }
-    puts "\nThe destination digits entered were $dest\n"
+    puts "        The destination digits entered were $dest"
 }
 
 proc act_CallSetupDone { } {
@@ -208,10 +221,10 @@ proc act_CallSetupDone { } {
     set status [infotag get evt_handoff_string]
     if { [string length $status] != 0} {
         regexp {([0-9][0-9][0-9])} $status StatusCode
-        puts "IP IVR Disconnect Status = $status" 
+        puts "        IP IVR Disconnect Status = $status" 
         switch $StatusCode {
           "016" {
-              puts "\n Connection success"
+              puts "        Connection success\n"
               fsm setstate CONTINUE
               act_Cleanup 
           }
@@ -221,7 +234,7 @@ proc act_CallSetupDone { } {
                   leg connect leg_incoming  
                   set legConnected true 
               }
-              puts "\n Call failed.  Play prompt and collect digit"
+              puts "        Call failed.  Play prompt and collect digit"
               if { ($StatusCode == "017") } {
                   set busyPrompt _dest_busy.au
               } 
@@ -229,7 +242,7 @@ proc act_CallSetupDone { } {
           }
         } 
     } else {
-        puts "\n Caller disconnected" 
+        puts "        Caller disconnected\n" 
         fsm setstate CALLDISCONNECT 
         act_Cleanup 
     }
@@ -244,7 +257,7 @@ proc act_Select { } {
     global retrycnt
     global busyPrompt
 
-    puts "\n proc act_Select"
+    puts "        Entering procedure act_Select"
 
     set promptFlag2 0
     set digit_collect_params(interruptPrompt) true
@@ -266,7 +279,7 @@ proc act_Select { } {
 proc act_PlayMaidID { } {
     global digit_collect_params
     global maidIDPattern
-    puts "entering PlayMaidID"
+    puts "        Entering procedure PlayMaidID"
 
     set pattern(account) $maidIDPattern
     leg collectdigits leg_incoming digit_collect_params pattern
@@ -281,10 +294,10 @@ proc act_ValidateMaidID { } {
     global roomID
 
     set maidID [infotag get evt_dcdigits]
-    puts "entering act_ValidateMaidID"
-    puts "Digits: $maidID\n"
+    puts "        Entering procedure act_ValidateMaidID"
+    puts "        These were the Digits entered for maidID: $maidID"
 
-    puts "***using Ani as room number:*** $useAniAsRoom\n"
+    puts "        ***using dialing number ANI as room number:*** $useAniAsRoom"
 
     if { $useAniAsRoom == "true" } {
 	set roomID [string range $ani 0 3]
@@ -300,7 +313,7 @@ proc act_PlayRoomID { } {
     global digit_collect_params
     global roomNumPattern
 
-    puts "entering PlayRoomID"
+    puts "         Entering procedure PlayRoomID"
 
     set pattern(account) $roomNumPattern
     leg collectdigits leg_incoming digit_collect_params pattern
@@ -313,8 +326,8 @@ proc act_ValidateRoomID { } {
     global roomID
 
     set roomID [infotag get evt_dcdigits]
-    puts "entering act_ValidateRoomID"
-    puts "Digits: $roomID\n"
+    puts "        Entering procedure act_ValidateRoomID"
+    puts "        These are the roomID Digits: $roomID"
 
     fsm setstate PLAYROOMSTATUS
 
@@ -323,7 +336,7 @@ proc act_ValidateRoomID { } {
 proc act_PlayRoomStatus { } {
     global digit_collect_params
 
-    puts "entering PlayRoomStatus"
+    puts "        Entering procedure PlayRoomStatus"
 
     set pattern(account) .
     leg collectdigits leg_incoming digit_collect_params pattern
@@ -336,15 +349,15 @@ proc act_ValidateRoomStatus { } {
     global roomStatus
 
     set roomStatus [infotag get evt_dcdigits]
-    puts "entering act_ValidateRoomStatus"
-    puts "Digits: $roomStatus\n"
+    puts "        Entering procedure act_ValidateRoomStatus"
+    puts "        This is the digit entered for roomStatus: $roomStatus"
 
     fsm setstate SENDCLOVERLEAF
 
     act_SendCloverleaf
 }
 proc act_DestBusy { } {
-    puts "\n proc act_DestBusy"
+    puts "        Entering procedure act_DestBusy"
     media play leg_incoming _disconnect.au
     fsm setstate CALLDISCONNECT
 }
@@ -357,24 +370,33 @@ proc act_SendCloverleaf { } {
     global maidID
     global roomID
     global roomStatus
+    global currentDateTimeSeconds
+    global currentDateTimeString
+    global localTimezone
 
-    puts "\n In Procedure sendCloverleaf\n"
+    puts "        Entering Procedure sendCloverleaf"
 
+    set currentDateTimeSeconds [clock seconds]
+    set currentDateTimeString [clock format $currentDateTimeSeconds \
+			       -format {%Y:%m:%d %H:%M:%S}]
+    
+    puts "        The DataTime from the router is :$currentDateTimeString"
+    
     if { $roomStatus == 2 } {
         set roomStringStatus "CL"
     } else {
         set roomStringStatus "PR"
     }
-
-    set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %7s %s MI    %4s%c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID "03"]
-
+    
+    set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %7s %s MI    %4s DS %s %c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID $currentDateTimeString "03"]
+    puts "        Writing message to syslog on router\n"
     log -s INFO $cloverleafCommand
-    puts "\n leaving Procedure sendCloverleaf\n"
+    puts "        Leaving Procedure sendCloverleaf"
     fsm setstate SAYBYEBYE
     act_SayGoodbye
 }
 proc act_SayGoodbye {} {
-    puts "\n in Procedure act_SayGoodbye\n"
+    puts "        Entering Procedure act_SayGoodbye"
     media play leg_incoming _goodbye.au
     fsm setstate CALLDISCONNECT
 }

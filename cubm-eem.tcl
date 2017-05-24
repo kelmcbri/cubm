@@ -19,10 +19,14 @@ set port ""
 
 regexp {.*%CUBM% (.*?):(.*?) \((.*?)\)} $msg match ip port msg
 
-set sd [socket $ip $port]
 
-puts -nonewline $sd [string trim $msg]
-puts -nonewline $sd "\r"
-
-flush $sd
-close $sd
+if { [catch {set sd [socket $ip $port]}] } {
+   puts -nonewline stderr "        Connection to Cloverleaf at $ip : $port has Failed ***\n\r"
+   exit 1
+ } else {
+    puts -nonewline "$msg sent to Cloverleaf at $ip : $port\r"
+    puts -nonewline $sd [string trim $msg]
+    puts -nonewline $sd "\r"
+    flush $sd
+    close $sd
+}

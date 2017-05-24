@@ -1,4 +1,4 @@
-# Script Version: 0.2
+# Script Version: 0.5
 # Script Name: CUBM
 #------------------------------------------------------------------
 # September 9, 2009 , Keller McBride kelmcbri@cisco.com
@@ -12,7 +12,7 @@
 # The program uses a protocol specified by Cloverleaf over a TCP connection.
 # 
 # INBOUND DATA TO CLOVERLEAF FROM  PBX
-# Data Format – ASCII text file
+# Data Format Ã± ASCII text file
 # Data Example:
 #        Room Status Change:
 # 
@@ -26,9 +26,9 @@
 #Any additional room status sent by PBX should be ignored.
 # 
 #2.	MAID ID 
-#If no Maid ID is entered, PBX will send a “0” in the Maid Id field.
+#If no Maid ID is entered, PBX will send a Ã¬0Ã® in the Maid Id field.
 # 
-#Cloverleaf should check to see if the Maid Id = “0” move “9999” to the #Maid ID field else Maid ID should be sent to Meditech. 
+#Cloverleaf should check to see if the Maid Id = Ã¬0Ã® move Ã¬9999Ã® to the #Maid ID field else Maid ID should be sent to Meditech. 
 # 
 # 
 #Data Layout from  PBX 
@@ -63,11 +63,16 @@ proc init { } {
     set param1(interruptPrompt) true
     set param1(abortKey) *
     set param1(terminationKey) #
+	set param1(dialPlan) true
+	set param1(enableReporting) true
+	
     set selectCnt 0
     set legConnected false
 	param register aa-pilot "CUBM pilot number" "*1234" "s"
 	param register cloverleaf-ip "IP Address of Cloverleaf server" "127.0.0.1" "s"
 	param register cloverleaf-port "Port number to access Cloverleaf server" "12345" "i"
+	param register maid-id-pattern "Pattern to use to match maid ID" "...." "s"
+	param register room-num-pattern "Pattern to use to match room number" "...." "s"
 }
 proc init_ConfigVars { } {
     global destination
@@ -76,13 +81,18 @@ proc init_ConfigVars { } {
 	global cloverleafIP
 	global cloverleafPort
 	global cloverleafSocket
-
+	global maidIDPattern
+	global roomNumPattern
+	
 # aa-pilot is the IVR number configured on the gateway to be used by the customer
 # operator is the operator number for assisted calling
 
     set aaPilot [string trim [infotag get cfg_avpair aa-pilot]]
     set cloverleafIP [string trim [infotag get cfg_avpair cloverleaf-ip]]
 	set cloverleafPort [string trim [infotag get cfg_avpair cloverleaf-port]]
+	set maidIDPattern [string trim [infotag get cfg_avpair maid-id-pattern]]
+	set roomNumPattern [string trim [infotag get cfg_avpair room-num-pattern]]
+	
 	set cloverleafSocket -1
 }
 proc init_CloverSocket { } {
@@ -245,17 +255,14 @@ proc act_Select { } {
     }
 }
 proc act_PlayMaidID { } {
-	puts "entering PlayMaidID"
-	media play leg_incoming _get_maid_id.au
-	fsm setstate GETMAIDID
-}
-proc act_GetMaidID { } {
 	global param1
-	set param1(dialPlan) true
-	set pattern(account) .+
-	puts "entering GetMaidID"
-	set param1(enableReporting) true
+	global maidIDPattern
+	puts "entering PlayMaidID"
+	
+	set pattern(account) $maidIDPattern
 	leg collectdigits leg_incoming param1 pattern
+	media play leg_incoming _get_maid_id.au
+
 	fsm setstate VALIDATEMAIDID
 }
 proc act_ValidateMaidID { } {
@@ -271,20 +278,16 @@ proc act_ValidateMaidID { } {
 	act_PlayRoomID
 }
 proc act_PlayRoomID { } {
-	puts "entering PlayRoomID"
-	fsm setstate GETROOMID
-	media play leg_incoming _get_room_num.au
-	act_GetRoomID
-	#	fsm setstate GETROOMID
-}
-proc act_GetRoomID { } {
 	global param1
-	set param1(dialPlan) true
-	set param1(interruptPrompt) true
-	set pattern(account) .+
-	puts "entering GetRoomID"
-	set param1(enableReporting) true
+	global roomNumPattern
+	
+	puts "entering PlayRoomID"
+	
+	set pattern(account) $roomNumPattern
 	leg collectdigits leg_incoming param1 pattern
+	
+	media play leg_incoming _get_room_num.au
+
 	fsm setstate VALIDATEROOMID
 }
 proc act_ValidateRoomID { } {
@@ -300,18 +303,15 @@ proc act_ValidateRoomID { } {
 	act_PlayRoomStatus
 }
 proc act_PlayRoomStatus { } {
-	puts "entering PlayRoomStatus"
-	media play leg_incoming _get_status.au
-	fsm setstate GETROOMSTATUS
-}
-proc act_GetRoomStatus { } {
 	global param1
-	set param1(dialPlan) true
-	set param1(interruptPrompt) true
-	set pattern(account) .+
-	puts "entering GetRoomStatus"
-	set param1(enableReporting) true
+	
+	puts "entering PlayRoomStatus"
+	
+	set pattern(account) .
 	leg collectdigits leg_incoming param1 pattern
+	
+	media play leg_incoming _get_status.au
+
 	fsm setstate VALIDATEROOMSTATUS
 }
 proc act_ValidateRoomStatus { } {
@@ -335,17 +335,29 @@ proc act_Cleanup { } {
     call close
 }
 proc act_SendCloverleaf { } {
-	global sd
+	global cloverleafSocket
+	global cloverleafIP
+	global cloverleafPort
+	global maidID
+	global roomID
+	global roomStatus
+	
+	puts "\n In Procedure sendCloverleaf\n"
 
-	puts "\n In Procedure giveClover\n"
+	if { $cloverleafSocket == -1 } {
+	    set cloverleafSocket 1
+	}
 
-	leg disconnect
-#	set sd [socket "192.168.200.2" 80]
-#	puts $sd {
-#?ST    8099 PR MI    7896?
-#	}
-#	flush $sd
-#	fsm setstate GAVECLOVER
+	if { $roomStatus == 1 } {
+		set roomStringStatus "PR"
+	} else {
+		set roomStringStatus "CL"
+	}
+	
+	set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %7u %s MI    %4u%c)" $cloverleafIP $cloverleafPort "02"  $roomID $roomStringStatus $maidID "03"]
+	
+	log -s INFO $cloverleafCommand
+	call close
 }
 proc receiveClover { } {
     puts "\n In Procedure receiveClover\n"
@@ -360,14 +372,11 @@ init_ConfigVars
 #----------------------------------
   set fsm(any_state,ev_disconnected)   				"act_Cleanup  same_state"
   set fsm(CALL_INIT,ev_setup_indication) 			"act_Setup  PLAYMAIDID"
-  set fsm(PLAYMAIDID,ev_any_event)					"act_PlayMaidID GETMAIDID"
-  set fsm(GETMAIDID,ev_media_done)					"act_GetMaidID VALIDATEMAIDID"
+  set fsm(PLAYMAIDID,ev_any_event)					"act_PlayMaidID VALIDATEMAIDID"
   set fsm(VALIDATEMAIDID,ev_collectdigits_done)		"act_ValidateMaidID PLAYROOMID"
-  set fsm(PLAYROOMID,ev_any_event)					"act_PlayRoomID GETROOMID"
-  set fsm(GETROOMID,ev_media_done)					"act_GetRoomID VALIDATEROOMID"
+  set fsm(PLAYROOMID,ev_any_event)					"act_PlayRoomID VALIDATEROOMID"
   set fsm(VALIDATEROOMID,ev_collectdigits_done) 	"act_ValidateRoomID PLAYROOMSTATUS"
-  set fsm(PLAYROOMSTATUS,ev_any_event)				"act_PlayRoomStatus GETROOMSTATUS"
-  set fsm(GETROOMSTATUS,ev_media_done)				"act_GetRoomStatus VALIDATEROOMSTATUS"
+  set fsm(PLAYROOMSTATUS,ev_any_event)				"act_PlayRoomStatus VALIDATEROOMSTATUS"
   set fsm(VALIDATEROOMSTATUS,ev_collectdigits_done) "act_ValidateRoomStatus SENDCLOVERLEAF"
   set fsm(SENDCLOVERLEAF,ev_any_event)				"act_SendCloverleaf CALLDISCONNECT"
   set fsm(HANDOFF,ev_returned)   					"act_CallSetupDone  CONTINUE"

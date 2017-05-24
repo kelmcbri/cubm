@@ -63,28 +63,27 @@ proc init { } {
     set param1(interruptPrompt) true
     set param1(abortKey) *
     set param1(terminationKey) #
-
     set selectCnt 0
     set legConnected false
+	param register aa-pilot "CUBM pilot number" "*1234" "s"
+	param register cloverleaf-ip "IP Address of Cloverleaf server" "127.0.0.1" "s"
+	param register cloverleaf-port "Port number to access Cloverleaf server" "12345" "i"
 }
 proc init_ConfigVars { } {
     global destination
     global aaPilot
     global oprtr
+	global cloverleafIP
+	global cloverleafPort
+	global cloverleafSocket
 
 # aa-pilot is the IVR number configured on the gateway to be used by the customer
 # operator is the operator number for assisted calling
 
-    if [infotag get cfg_avpair_exists aa-pilot] {
-        set aaPilot [string trim [infotag get cfg_avpair aa-pilot]]
-    } else {
-        set aaPilot "NONE"
-    }
-    if [infotag get cfg_avpair_exists operator] {
-        set oprtr [string trim [infotag get cfg_avpair operator]]
-    } else {
-        set oprtr "NONE"
-    }
+    set aaPilot [string trim [infotag get cfg_avpair aa-pilot]]
+    set cloverleafIP [string trim [infotag get cfg_avpair cloverleaf-ip]]
+	set cloverleafPort [string trim [infotag get cfg_avpair cloverleaf-port]]
+	set cloverleafSocket -1
 }
 proc init_CloverSocket { } {
 	global 
@@ -124,21 +123,33 @@ proc act_Setup { } {
     global busyPrompt
     global legConnected
 
-    puts "\n\nproc act_Setup"
+    puts "\n\nproc act_Setup\n\n"
     set busyPrompt _dest_unreachable.au
     set beep 0
     init_perCallVars
     infotag set med_language 1
 
+    if { ($dnis == "") || ($dnis == $aaPilot) } {
         leg setupack leg_incoming
     	leg proceeding leg_incoming
     	leg connect leg_incoming
         set legConnected true
-	    puts "\nCall Recieved, collecting Maid ID\n"
-        set param1(maxDigits) 4 
-        media play leg_incoming en_get_maid_id.au
-		leg collectdigits leg_incoming param1
-        fsm setstate any_state
+		  
+
+	puts "\nNo DNIS\n"
+#       set param1(dialPlan) true
+#       leg collectdigits leg_incoming param1
+#       media play leg_incoming _get_maid_id.au
+		fsm setstate PLAYMAIDID
+		act_PlayMaidID
+    } else {
+        set fcnt 6
+	leg setupack leg_incoming
+        handoff callappl leg_incoming default "DESTINATION=$dnis"
+        fsm setstate HANDOFF
+    } 
+
+
 }
 proc act_GotDest { } {
     global dest
@@ -173,6 +184,39 @@ proc act_GotDest { } {
     }
 	puts "\nThe destination digits entered were $dest\n"
 }
+proc act_CallSetupDone { } {
+    global busyPrompt
+    global legConnected 
+
+    set status [infotag get evt_handoff_string]
+    if { [string length $status] != 0} {
+        regexp {([0-9][0-9][0-9])} $status StatusCode
+        puts "IP IVR Disconnect Status = $status" 
+        switch $StatusCode {
+          "016" {
+              puts "\n Connection success"
+              fsm setstate CONTINUE
+              act_Cleanup 
+          }
+          default {
+              if { $legConnected == "false" } {
+                  leg proceeding leg_incoming  
+                  leg connect leg_incoming  
+                  set legConnected true 
+              }
+              puts "\n Call failed.  Play prompt and collect digit"
+              if { ($StatusCode == "017") } {
+                  set busyPrompt _dest_busy.au
+              } 
+              act_Select
+          }
+        } 
+    } else {
+        puts "\n Caller disconnected" 
+        fsm setstate CALLDISCONNECT 
+        act_Cleanup 
+    }
+}
 proc act_Select { } {
     global destination
     global promptFlag2
@@ -195,10 +239,92 @@ proc act_Select { } {
     if { $fcnt < $retrycnt } {
     	media play leg_incoming $busyPrompt %s500 _reenter_dest.au
 	incr fcnt
-    	fsm setstate same_state
+    	fsm setstate GETROOM
     } else {
 	act_DestBusy
     }
+}
+proc act_PlayMaidID { } {
+	puts "entering PlayMaidID"
+	media play leg_incoming _get_maid_id.au
+	fsm setstate GETMAIDID
+}
+proc act_GetMaidID { } {
+	global param1
+	set param1(dialPlan) true
+	set pattern(account) .+
+	puts "entering GetMaidID"
+	set param1(enableReporting) true
+	leg collectdigits leg_incoming param1 pattern
+	fsm setstate VALIDATEMAIDID
+}
+proc act_ValidateMaidID { } {
+	global maidID
+	
+	set maidID [infotag get evt_dcdigits]
+	puts "entering act_ValidateMaidID"
+	puts "Digits: $maidID\n"
+	
+	fsm setstate PLAYROOMID
+
+	# FIXME: event workaround
+	act_PlayRoomID
+}
+proc act_PlayRoomID { } {
+	puts "entering PlayRoomID"
+	fsm setstate GETROOMID
+	media play leg_incoming _get_room_num.au
+	act_GetRoomID
+	#	fsm setstate GETROOMID
+}
+proc act_GetRoomID { } {
+	global param1
+	set param1(dialPlan) true
+	set param1(interruptPrompt) true
+	set pattern(account) .+
+	puts "entering GetRoomID"
+	set param1(enableReporting) true
+	leg collectdigits leg_incoming param1 pattern
+	fsm setstate VALIDATEROOMID
+}
+proc act_ValidateRoomID { } {
+	global roomID
+	
+	set roomID [infotag get evt_dcdigits]
+	puts "entering act_ValidateRoomID"
+	puts "Digits: $roomID\n"
+	
+	fsm setstate PLAYROOMSTATUS
+
+	# FIXME: event workaround
+	act_PlayRoomStatus
+}
+proc act_PlayRoomStatus { } {
+	puts "entering PlayRoomStatus"
+	media play leg_incoming _get_status.au
+	fsm setstate GETROOMSTATUS
+}
+proc act_GetRoomStatus { } {
+	global param1
+	set param1(dialPlan) true
+	set param1(interruptPrompt) true
+	set pattern(account) .+
+	puts "entering GetRoomStatus"
+	set param1(enableReporting) true
+	leg collectdigits leg_incoming param1 pattern
+	fsm setstate VALIDATEROOMSTATUS
+}
+proc act_ValidateRoomStatus { } {
+	global roomStatus
+	
+	set roomStatus [infotag get evt_dcdigits]
+	puts "entering act_ValidateRoomStatus"
+	puts "Digits: $roomStatus\n"
+	
+	fsm setstate SENDCLOVERLEAF
+
+	# FIXME: event workaround
+	act_SendCloverleaf
 }
 proc act_DestBusy { } {
     puts "\n proc act_DestBusy"
@@ -208,15 +334,18 @@ proc act_DestBusy { } {
 proc act_Cleanup { } {
     call close
 }
-proc giveClover { } {
+proc act_SendCloverleaf { } {
 	global sd
+
 	puts "\n In Procedure giveClover\n"
-	set sd [socket "192.168.200.2" 80]
-	puts $sd {
-?ST    8099 PR MI    7896?
-	}
-	flush $sd
-	fsm setstate GAVECLOVER
+
+	leg disconnect
+#	set sd [socket "192.168.200.2" 80]
+#	puts $sd {
+#?ST    8099 PR MI    7896?
+#	}
+#	flush $sd
+#	fsm setstate GAVECLOVER
 }
 proc receiveClover { } {
     puts "\n In Procedure receiveClover\n"
@@ -229,9 +358,19 @@ init_ConfigVars
 #----------------------------------
 #   State Machine
 #----------------------------------
-  set fsm(any_state,ev_disconnected)   		"act_Cleanup  same_state"
-  set fsm(CALL_INIT,ev_setup_indication) 	"act_Setup  GETMAIDID"
-  set fsm(GETMAIDID,ev_collectdigits_done) 	"act_GotDest CONTINUE"
-  set fsm(CALLDISCONNECT,ev_media_done) 	"act_Cleanup  same_state"
+  set fsm(any_state,ev_disconnected)   				"act_Cleanup  same_state"
+  set fsm(CALL_INIT,ev_setup_indication) 			"act_Setup  PLAYMAIDID"
+  set fsm(PLAYMAIDID,ev_any_event)					"act_PlayMaidID GETMAIDID"
+  set fsm(GETMAIDID,ev_media_done)					"act_GetMaidID VALIDATEMAIDID"
+  set fsm(VALIDATEMAIDID,ev_collectdigits_done)		"act_ValidateMaidID PLAYROOMID"
+  set fsm(PLAYROOMID,ev_any_event)					"act_PlayRoomID GETROOMID"
+  set fsm(GETROOMID,ev_media_done)					"act_GetRoomID VALIDATEROOMID"
+  set fsm(VALIDATEROOMID,ev_collectdigits_done) 	"act_ValidateRoomID PLAYROOMSTATUS"
+  set fsm(PLAYROOMSTATUS,ev_any_event)				"act_PlayRoomStatus GETROOMSTATUS"
+  set fsm(GETROOMSTATUS,ev_media_done)				"act_GetRoomStatus VALIDATEROOMSTATUS"
+  set fsm(VALIDATEROOMSTATUS,ev_collectdigits_done) "act_ValidateRoomStatus SENDCLOVERLEAF"
+  set fsm(SENDCLOVERLEAF,ev_any_event)				"act_SendCloverleaf CALLDISCONNECT"
+  set fsm(HANDOFF,ev_returned)   					"act_CallSetupDone  CONTINUE"
+  set fsm(CALLDISCONNECT,ev_media_done) 			"act_Cleanup  same_state"
 
   fsm define fsm CALL_INIT

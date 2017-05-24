@@ -1,9 +1,9 @@
-# Script Version: 2.1
+# Script Version: 2.2
 # Script Name: CUBM
 #-------------------------------------------------------------------------
 # Originally Created September 9, 2009 , Keller McBride kelmcbri@cisco.com
 #-------------------------------------------------------------------------
-# This version created July 29, 2013 Keller McBride
+# This version created August 15, 2013 Keller McBride
 #-------------------------------------------------------------------------
 # Description: 
 # This is a TCL script to create a Bed Management interface between
@@ -29,31 +29,32 @@
 #If no Maid ID is entered, PBX will send a 9999 in the Maid Id field.
 #
 #Data Layout from  PBX 
-#Position		Field Name 		Value			Data type
-# 1 			Beginning Character 	StartCharacter 		(02Hex)
-# 2-3 			STATUS ST 		ST (hardcoded)		Denote Status message
-# 4 			Space
-# 5-6-7-8-9-10-11 	Room Number 		XXXXXXX 		1-7 digits right justified
-# 12 			Space
-# 13-14 		Room Status 		PR or CL 		CL=cleaned; PR=cleaning in progress
-# 15 			Space
-# 16-17 		MaidID to Follow 	MI 			Denotes Maid Id will follow
-# 18 			Space
-# 19-20-21-22 		Value for Maid Id 	XXXX 			Can be 1?4 digits right justified. Not required. If no maid id entered, Cloverleaf will pad with generic id 9999
-# 23 			Space
-# 24-25 		TimeStamp to Follow 	DS 			DS Denotes Date/TimeStamp to Follow
-# 26 			Space
-# 27-28-29-30 		Year 			XXXX CCYY 		Date/Time stamp Year
-# 31 			Space
-# 32-33 		Month 			XX 			MM Date/Time stamp month
-# 34 			Separator		: 			
-# 35-36 		Hour 			XX 			HH (valid time hour in 24 hr format)
-# 37 			Separator 		:
-# 38-39 		Minutes 		XX 			MM(Valid time minutes)
-# 40 			Separator		:
-# 41-42 		Seconds 		XX 			SS Date/Time Stamp Seconds
-# 43 			Ending Character 				End Character (03 Hex)
-#
+# Position			Field Name 		Value		Note
+# 1				Beginning Character	Start Character (02 Hex)	
+# 2-3				STATUS			ST		ST  (hard coded) Denote Status message 
+# 4				Space		
+# 5-6-7-8-9-10-11-12-13-14	Room Number		XXXXXXXXXX	1-10 digits #right justified
+# 15				Space		
+# 16-17				Room Status		PR or CL	CL=cleaned; PR=cleaning in progress
+# 18				Space		
+# 19-20				MaidID to Follow	MI		Denotes Maid Id #will follow
+# 21				Space		
+# 22-23-24-25			Value for Maid Id	XXXX		Can be #1-4 digits right justified.  Not required.  If no maid id entered, #Cloverleaf will pad with generic id 9999 
+# 26				Space		
+# 27-28				TimeStamp to Follow	DS		DS Denotes Date/Time Stamp to Follow
+# 29				Space		
+# 30-31-32-33			Year			XXXX		CCYY Date/Time stamp Year
+# 34							:		
+# 35-36				Month			XX		MM Date/Time stamp month
+# 37							:		Separator
+# 38-39				Day			XX		Day Date/Time Stamp Day of Month
+# 40				Space		
+# 41-42				Hour			XX		HH (valid time hour in 24 hr format)
+# 43							:		Separator
+# 44-45				Minutes			XX		MM(Valid time minutes)
+# 46							:		Separator
+# 47-48				Seconds			XX		SS Date/Time Stamp Seconds
+# 49				Ending Character	End Character 	(03 Hex)	
 #-------------------------------------------------------------------
 # Version 1.1 fixes
 # changed printf function in sendCloverleaf procedure to accept leading 0s for room number and maidID
@@ -72,6 +73,8 @@
 #     Fixed CUBM to work with OneVoice 10 Digit dial plan
 #      The room number was pulling the FIRST x digits instead of the LAST x digits from the ani
 #       in proc act_ValidateMaidID.
+# Version 2.2 Changes
+#	Change max room number digits to 10 - was 7
 
 proc init { } {
     global digit_collect_params
@@ -93,7 +96,7 @@ proc init { } {
     param register cloverleaf-ip "IP Address of Cloverleaf server" "127.0.0.1" "s"
     param register cloverleaf-port "Port number to access Cloverleaf server" "12345" "i"
     param register maid-id-pattern "Pattern to use to match maid ID" "...." "s"
-    param register room-digits "Number of digits in room number" "5" "i"
+    param register room-digits "Number of digits in room number" "10" "i"
     param register central-timezone-offset "offset in hours from central timezone" "+0" "i"
 }
 
@@ -415,7 +418,7 @@ proc act_SendCloverleaf { } {
         set roomStringStatus "PR"
     }
     
-    set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %7s %s MI    %4s DS %s %c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID $currentDateTimeString "03"]
+    set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %10s %s MI    %4s DS %s %c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID $currentDateTimeString "03"]
     puts "        Writing message to syslog on router\n"
     log -s INFO $cloverleafCommand
     puts "        Leaving Procedure sendCloverleaf"

@@ -1,9 +1,10 @@
-# Script Version: 1.2
+# Script Version: 2.0
 # Script Name: CUBM
 #-------------------------------------------------------------------------
 # Originally Created September 9, 2009 , Keller McBride kelmcbri@cisco.com
 #-------------------------------------------------------------------------
-#
+# This version created November 28, 2012, Keller McBride
+#-------------------------------------------------------------------------
 # Description: 
 # This is a TCL script to create a Bed Management interface between
 # Cisco Unified Communications Manager and HCA Meditech Bed Management
@@ -62,6 +63,11 @@
 #    Added a catch in cubm-eem.tcl to print error message to router console if tcp connection to Cloverleaf failed.
 #    NEW TIMESTAMP ADDED TO PACKET SENT TO CLOVERLEAF - positions 25-32 inserted
 #
+# Version 2.0 Changes
+#    Added central-time-offset parameter to allow the router to have central timezone configured even when you want
+#    cubm to run in a different timezone.  HCA requires all network devices be managed in Central Timezone
+#    Added room-digits parameter to router config.  It allows you to enter a 4 or 5 depending on the number of
+#    digits in your room numbers.
 proc init { } {
     global digit_collect_params
     global selectCnt
@@ -82,8 +88,8 @@ proc init { } {
     param register cloverleaf-ip "IP Address of Cloverleaf server" "127.0.0.1" "s"
     param register cloverleaf-port "Port number to access Cloverleaf server" "12345" "i"
     param register maid-id-pattern "Pattern to use to match maid ID" "...." "s"
-    param register room-num-pattern "Pattern to use to match room number" "....." "s"
-    param register local-Timezone "Local Timezone" "cst" "s"
+    param register room-digits "Number of digits in room number" "5" "i"
+    param register central-timezone-offset "offset in hours from central timezone" "+0" "i"
 }
 
 proc init_ConfigVars { } {
@@ -95,8 +101,9 @@ proc init_ConfigVars { } {
     global cloverleafIP
     global cloverleafPort
     global maidIDPattern
+    global roomDigits
     global roomNumPattern
-    global localTimezone
+    global centralTimezoneOffset
 
 # aa-pilot is the IVR number configured on the gateway - will use ANI as room number
 # aa-pilot2 is the IVR number configured on the gateway - will ask for room number
@@ -107,8 +114,9 @@ proc init_ConfigVars { } {
     set cloverleafIP [string trim [infotag get cfg_avpair cloverleaf-ip]]
     set cloverleafPort [string trim [infotag get cfg_avpair cloverleaf-port]]
     set maidIDPattern [string trim [infotag get cfg_avpair maid-id-pattern]]
-    set roomNumPattern [string trim [infotag get cfg_avpair room-num-pattern]]
-    set localTimezone [string trim [infotag get cfg_avpair local-Timezone]]
+    set roomDigits [string trim [infotag get cfg_avpair room-digits]]
+    set roomNumPattern [string repeat "." $roomDigits]
+    set centralTimezoneOffset [string trim [infotag get cfg_avpair central-timezone-offset]]
 }
 
 proc init_perCallVars { } {
@@ -292,6 +300,7 @@ proc act_ValidateMaidID { } {
     global useAniAsRoom
     global ani
     global roomID
+    global roomDigits
 
     set maidID [infotag get evt_dcdigits]
     puts "        Entering procedure act_ValidateMaidID"
@@ -300,7 +309,7 @@ proc act_ValidateMaidID { } {
     puts "        ***using dialing number ANI as room number:*** $useAniAsRoom"
 
     if { $useAniAsRoom == "true" } {
-	set roomID [string range $ani 0 3]
+	set roomID [string range $ani 0 [expr $roomDigits - 1]]
 
 	fsm setstate PLAYROOMSTATUS
 	act_PlayRoomStatus
@@ -372,15 +381,22 @@ proc act_SendCloverleaf { } {
     global roomStatus
     global currentDateTimeSeconds
     global currentDateTimeString
-    global localTimezone
+    global centralTimezoneOffset
 
     puts "        Entering Procedure sendCloverleaf"
 
     set currentDateTimeSeconds [clock seconds]
-    set currentDateTimeString [clock format $currentDateTimeSeconds \
-			       -format {%Y:%m:%d %H:%M:%S}]
+    set currentDateTimeString [clock format $currentDateTimeSeconds -format {%H:%M:%S}]
     
-    puts "        The DataTime from the router is :$currentDateTimeString"
+    puts "        The Time from the router is :$currentDateTimeString"
+    puts "        Your offset from Central Timezone is :$centralTimezoneOffset hours"
+    
+    set currentDateTimeSeconds [expr $currentDateTimeSeconds + [expr $centralTimezoneOffset * 3600]]
+    set currentDateTimeString [clock format $currentDateTimeSeconds -format {%Y:%m:%d %H:%M:%S}]
+    
+    puts "        The DateTime to send to Cloverleaf is :$currentDateTimeString"
+    puts "        This includes an offset from Central time of :$centralTimezoneOffset hours"
+
     
     if { $roomStatus == 2 } {
         set roomStringStatus "CL"

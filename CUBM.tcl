@@ -1,4 +1,4 @@
-# Script Version: 2.2
+# Script Version: 2.4
 # Script Name: CUBM
 #-------------------------------------------------------------------------
 # Originally Created September 9, 2009 , Keller McBride kelmcbri@cisco.com
@@ -75,6 +75,10 @@
 #       in proc act_ValidateMaidID.
 # Version 2.2 Changes
 #	Change max room number digits to 10 - was 7
+# Version 2.4 Changes
+#	Add a variable to set whether original Nortel Hospitality format is sent to Cloverleaf or new
+#          Cisco format with timestamp added.
+#          Variable useTimeStamp with Default TRUE added to procedure init_ConfigVars
 
 proc init { } {
     global digit_collect_params
@@ -112,6 +116,7 @@ proc init_ConfigVars { } {
     global roomDigits
     global roomNumPattern
     global centralTimezoneOffset
+    global useTimeStamp
 
 # aa-pilot is the IVR number configured on the gateway - will use ANI as room number
 # aa-pilot2 is the IVR number configured on the gateway - will ask for room number
@@ -125,6 +130,7 @@ proc init_ConfigVars { } {
     set roomDigits [string trim [infotag get cfg_avpair room-digits]]
     set roomNumPattern [string repeat "." $roomDigits]
     set centralTimezoneOffset [string trim [infotag get cfg_avpair central-timezone-offset]]
+    set useTimeStamp "TRUE"
 }
 
 proc init_perCallVars { } {
@@ -396,6 +402,7 @@ proc act_SendCloverleaf { } {
     global currentDateTimeSeconds
     global currentDateTimeString
     global centralTimezoneOffset
+    global useTimeStamp
 
     puts "        Entering Procedure sendCloverleaf"
 
@@ -418,7 +425,11 @@ proc act_SendCloverleaf { } {
         set roomStringStatus "PR"
     }
     
-    set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %10s %s MI    %4s DS %s %c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID $currentDateTimeString "03"]
+    if { $useTimeStamp == "TRUE" } {
+        set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %10s %s MI    %4s DS %s %c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID $currentDateTimeString "03"]
+    } else {
+    	    set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %7s %s MI    %4s%c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID "03"]
+    }
     puts "        Writing message to syslog on router\n"
     log -s INFO $cloverleafCommand
     puts "        Leaving Procedure sendCloverleaf"

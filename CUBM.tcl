@@ -1,9 +1,9 @@
-# Script Version: 2.0
+# Script Version: 2.1
 # Script Name: CUBM
 #-------------------------------------------------------------------------
 # Originally Created September 9, 2009 , Keller McBride kelmcbri@cisco.com
 #-------------------------------------------------------------------------
-# This version created November 28, 2012, Keller McBride
+# This version created July 29, 2013 Keller McBride
 #-------------------------------------------------------------------------
 # Description: 
 # This is a TCL script to create a Bed Management interface between
@@ -67,7 +67,12 @@
 #    Added central-time-offset parameter to allow the router to have central timezone configured even when you want
 #    cubm to run in a different timezone.  HCA requires all network devices be managed in Central Timezone
 #    Added room-digits parameter to router config.  It allows you to enter a 4 or 5 depending on the number of
-#    digits in your room numbers.
+#    digits in your room numbers.#
+# Version 2.1 Changes
+#     Fixed CUBM to work with OneVoice 10 Digit dial plan
+#      The room number was pulling the FIRST x digits instead of the LAST x digits from the ani
+#       in proc act_ValidateMaidID.
+
 proc init { } {
     global digit_collect_params
     global selectCnt
@@ -122,6 +127,7 @@ proc init_ConfigVars { } {
 proc init_perCallVars { } {
     puts "        Entering procedure init_perCallvars"
     global ani
+    global anilength
     global digit_enabled
     global fcnt
     global retrycnt
@@ -136,6 +142,8 @@ proc init_perCallVars { } {
     set digit_enabled "FALSE"
     set ani [infotag get leg_ani]
     puts "        The Calling ANI is: $ani"
+    set anilength [string length $ani]
+    puts "        ANI has $anilength digits"
     set dnis [infotag get leg_dnis]
     puts "        The called number DNIS is: $dnis"
 
@@ -301,6 +309,7 @@ proc act_ValidateMaidID { } {
     global ani
     global roomID
     global roomDigits
+    global anilength
 
     set maidID [infotag get evt_dcdigits]
     puts "        Entering procedure act_ValidateMaidID"
@@ -309,7 +318,7 @@ proc act_ValidateMaidID { } {
     puts "        ***using dialing number ANI as room number:*** $useAniAsRoom"
 
     if { $useAniAsRoom == "true" } {
-	set roomID [string range $ani 0 [expr $roomDigits - 1]]
+	set roomID [string range $ani [expr $anilength - $roomDigits ] $anilength]
 
 	fsm setstate PLAYROOMSTATUS
 	act_PlayRoomStatus
@@ -344,8 +353,10 @@ proc act_ValidateRoomID { } {
 }
 proc act_PlayRoomStatus { } {
     global digit_collect_params
+    global roomID
 
     puts "        Entering procedure PlayRoomStatus"
+    puts "        The room number being used is: $roomID"
 
     set pattern(account) .
     leg collectdigits leg_incoming digit_collect_params pattern

@@ -1,4 +1,4 @@
-# Script Version: 0.9
+# Script Version: 1
 # Script Name: CUBM
 #------------------------------------------------------------------
 # September 9, 2009 , Keller McBride kelmcbri@cisco.com
@@ -12,7 +12,7 @@
 # The program uses a protocol specified by Cloverleaf over a TCP connection.
 #
 # INBOUND DATA TO CLOVERLEAF FROM  PBX
-# Data Format Ã± ASCII text file
+# Data Format – ASCII text file
 # Data Example:
 #        Room Status Change:
 #
@@ -26,27 +26,27 @@
 #Any additional room status sent by PBX should be ignored.
 #
 #2.	MAID ID 
-#If no Maid ID is entered, PBX will send a Ã¬0Ã® in the Maid Id field.
+#If no Maid ID is entered, PBX will send a “0” in the Maid Id field.
 #
-#Cloverleaf should check to see if the Maid Id = Ã¬0Ã® move Ã¬9999Ã® to the #Maid ID field else Maid ID should be sent to Meditech. 
+#Cloverleaf should check to see if the Maid Id = “0” move “9999” to the #Maid ID field else Maid ID should be sent to Meditech. 
 #
 #
 #Data Layout from  PBX 
-#Position	Field Name 	Value	Data type
+#Position		Field Name 			Value		Data type
 #X = Alphanumeric
 #9 = Numeric	Notes
-#0	Beginning Character	Start Character	 (02HEX)	 
-#1-2	STATUS	ST  (hard coded)	XX	Denote Status message 
 #
-#3	Space	 	 	 
-#4-5-6-7-8-9-10	Room Number	8099 (valid room number)	XXXXXXX	1-7 digits #right justified
-#11	Space	 	 	 
-#12-13	Room Status	PR (or CL)	XX	CL=cleaned; PR=cleaning in progress
-#14	Space	 	 	 
-#15-16	Denotes MAID ID to follow 	MI (hard coded)	XX	Denotes Maid Id #will follow
-#17-18-19-20	Space	 	 	 
-#21-22-23-24	Value for Maid Id	7896 (valid maid id)	XXXX	Can be #1-4 digits right justified.  Not required.  If no maid id entered, #Cloverleaf will pad with generic id 9999 
-# 25	Ending Character	End Character	 	(03HEX) 
+#0			Beginning Character		Start Character	 (02HEX)	 
+#1-2			STATUS				ST  (hard coded)	XX	Denote Status message 
+#3			Space	 	 	 
+#4-5-6-7-8-9-10		Room Number			8099 (valid room number) XXXXXXX	1-7 digits #right justified
+#11			Space	 	 	 
+#12-13			Room Status			PR (or CL)		XX	CL=cleaned; PR=cleaning in progress
+#14			Space	 	 	 
+#15-16			Denotes MAID ID to follow 	MI (hard coded)		XX	Denotes Maid Id #will follow
+#17-18-19-20		Space	 	 	 
+#21-22-23-24		Value for Maid Id		7896 (valid maid id)	XXXX	Can be #1-4 digits right justified.  Not required.  If no maid id entered, #Cloverleaf will pad with generic id 9999 
+#25			Ending Character		End Character	 	(03HEX) 
 #
 #
 #

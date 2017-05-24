@@ -1,4 +1,4 @@
-# Script Version: 0.8
+# Script Version: 0.9
 # Script Name: CUBM
 #------------------------------------------------------------------
 # September 9, 2009 , Keller McBride kelmcbri@cisco.com
@@ -91,7 +91,7 @@ proc init_ConfigVars { } {
 # operator is the operator number for assisted calling
 
     set aaPilot [string trim [infotag get cfg_avpair aa-pilot]]
-	set aaPilot2 [string trim [infotag get cfg_avpair aa-pilot2]]
+    set aaPilot2 [string trim [infotag get cfg_avpair aa-pilot2]]
     set cloverleafIP [string trim [infotag get cfg_avpair cloverleaf-ip]]
     set cloverleafPort [string trim [infotag get cfg_avpair cloverleaf-port]]
     set maidIDPattern [string trim [infotag get cfg_avpair maid-id-pattern]]
@@ -164,7 +164,7 @@ proc act_Setup { } {
         leg setupack leg_incoming
         handoff callappl leg_incoming default "DESTINATION=$dnis"
         fsm setstate HANDOFF
-    }
+   }
 }
 
 proc act_GotDest { } {
@@ -369,7 +369,14 @@ proc act_SendCloverleaf { } {
     set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %7u %s MI    %4u%c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID "03"]
 
     log -s INFO $cloverleafCommand
-    call close
+    puts "\n leaving Procedure sendCloverleaf\n"
+    fsm setstate SAYBYEBYE
+    act_SayGoodbye
+}
+proc act_SayGoodbye {} {
+    puts "\n in Procedure act_SayGoodbye\n"
+    media play leg_incoming _goodbye.au
+    fsm setstate CALLDISCONNECT
 }
 
 requiredversion 2.0
@@ -387,8 +394,9 @@ set fsm(PLAYROOMID,ev_any_event)                  "act_PlayRoomID VALIDATEROOMID
 set fsm(VALIDATEROOMID,ev_collectdigits_done) 	  "act_ValidateRoomID PLAYROOMSTATUS"
 set fsm(PLAYROOMSTATUS,ev_any_event)              "act_PlayRoomStatus VALIDATEROOMSTATUS"
 set fsm(VALIDATEROOMSTATUS,ev_collectdigits_done) "act_ValidateRoomStatus SENDCLOVERLEAF"
-set fsm(SENDCLOVERLEAF,ev_any_event)              "act_SendCloverleaf CALLDISCONNECT"
+set fsm(SENDCLOVERLEAF,ev_any_event)              "act_SendCloverleaf SAYBYEBYE"
 set fsm(HANDOFF,ev_returned)                      "act_CallSetupDone  CONTINUE"
+set fsm(SAYBYEBYE,ev_any_event)			  "act_SayGoodbye CALLDISCONNECT"
 set fsm(CALLDISCONNECT,ev_media_done)             "act_Cleanup  same_state"
 
 fsm define fsm CALL_INIT

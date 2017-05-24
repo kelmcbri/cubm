@@ -1,13 +1,5 @@
 ::cisco::eem::event_register_syslog occurs 1 pattern {.*%CUBM% .*} maxrun 9
 
-#
-# cubm-eem.tcl -- Send log message from CUBM to specified server.
-# Created: Marcus Butler <marbutle@cisco.com>, 25-Nov-2009.
-#
-# $Id$
-# $Log$
-#
-
 namespace import ::cisco::eem::*
 namespace import ::cisco::lib::*
 

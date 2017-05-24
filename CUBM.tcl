@@ -1,9 +1,9 @@
-# Script Version: 0.5
+# Script Version: CUBM.0.6
 # Script Name: CUBM
-#------------------------------------------------------------------
-# September 9, 2009 , Keller McBride kelmcbri@cisco.com
+#------------------------------------------------------------------------
+# November 25, 2009 , Keller McBride kelmcbri@cisco.com and Marcus Butler
 #         
-#------------------------------------------------------------------
+#------------------------------------------------------------------------
 #         
 # Description: 
 # This is a TCL script to create a Bed Management interface between
@@ -69,8 +69,8 @@ proc init { } {
     set selectCnt 0
     set legConnected false
 	param register aa-pilot "CUBM pilot number" "*1234" "s"
-	param register cloverleaf-ip "IP Address of Cloverleaf server" "127.0.0.1" "s"
-	param register cloverleaf-port "Port number to access Cloverleaf server" "12345" "i"
+	param register cloverleaf-ip "IP Address of Cloverleaf server" "165.214.13.55" "s"
+	param register cloverleaf-port "Port number to access Cloverleaf server" "10014" "i"
 	param register maid-id-pattern "Pattern to use to match maid ID" "...." "s"
 	param register room-num-pattern "Pattern to use to match room number" "...." "s"
 }
@@ -119,7 +119,6 @@ proc init_perCallVars { } {
     set dnis [infotag get leg_dnis]
     puts "\nDNIS $dnis"
 }
-
 proc act_Setup { } {
     global param1
     global selectCnt

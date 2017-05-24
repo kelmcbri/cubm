@@ -1,4 +1,4 @@
-# Script Version: 0.7
+# Script Version: 0.8
 # Script Name: CUBM
 #------------------------------------------------------------------
 # September 9, 2009 , Keller McBride kelmcbri@cisco.com
@@ -68,33 +68,34 @@ proc init { } {
     set legConnected false
 
     param register aa-pilot "CUBM pilot number" "234" "s"
+	param register aa-pilot2 "CUMB pilot number ask room" "235" "s"
     param register cloverleaf-ip "IP Address of Cloverleaf server" "127.0.0.1" "s"
     param register cloverleaf-port "Port number to access Cloverleaf server" "12345" "i"
     param register maid-id-pattern "Pattern to use to match maid ID" "...." "s"
     param register room-num-pattern "Pattern to use to match room number" "...." "s"
-    param register use-ani-as-room "Use ANI as the room id?" "false" "b"
 }
 
 proc init_ConfigVars { } {
     global destination
     global aaPilot
+	global aaPilot2
     global oprtr
 
     global cloverleafIP
     global cloverleafPort
     global maidIDPattern
     global roomNumPattern
-    global useAniAsRoom
 
-# aa-pilot is the IVR number configured on the gateway to be used by the customer
+# aa-pilot is the IVR number configured on the gateway - will use ANI as room number
+# aa-pilot2 is the IVR number configured on the gateway - will ask for room number
 # operator is the operator number for assisted calling
 
     set aaPilot [string trim [infotag get cfg_avpair aa-pilot]]
+	set aaPilot2 [string trim [infotag get cfg_avpair aa-pilot2]]
     set cloverleafIP [string trim [infotag get cfg_avpair cloverleaf-ip]]
     set cloverleafPort [string trim [infotag get cfg_avpair cloverleaf-port]]
     set maidIDPattern [string trim [infotag get cfg_avpair maid-id-pattern]]
     set roomNumPattern [string trim [infotag get cfg_avpair room-num-pattern]]
-    set useAniAsRoom [string trim [infotag get cfg_avpair use-ani-as-room]]
 }
 
 proc init_perCallVars { } {
@@ -104,6 +105,7 @@ proc init_perCallVars { } {
     global fcnt
     global retrycnt
     global dnis
+	global useAniAsRoom
 
     set fcnt 0
     set retrycnt 6
@@ -115,6 +117,7 @@ proc init_perCallVars { } {
     puts "\nANI $ani"
     set dnis [infotag get leg_dnis]
     puts "\nDNIS $dnis"
+
 }
 
 proc act_Setup { } {
@@ -126,9 +129,11 @@ proc act_Setup { } {
     global dnis
     global fcnt
     global aaPilot
+	global aaPilot2
     global oprtr
     global busyPrompt
     global legConnected
+	global useAniAsRoom
 
     puts "\n\nproc act_Setup\n\n"
     set busyPrompt _dest_unreachable.au
@@ -136,17 +141,25 @@ proc act_Setup { } {
     init_perCallVars
     infotag set med_language 1
 
-    if { ($dnis == "") || ($dnis == $aaPilot) } {
+    if { ($dnis == "") || ($dnis == $aaPilot2) } {
         leg setupack leg_incoming
     	leg proceeding leg_incoming
     	leg connect leg_incoming
         set legConnected true
-
-        puts "\nNo DNIS\n"
-
+        puts "\nMatch No DNIS or DNIS is aaPilot2\n"
+		set useAniAsRoom false
         fsm setstate PLAYMAIDID
         act_PlayMaidID
-    } else {
+    } elseif { ($dnis == $aaPilot) } {
+	    leg setupack leg_incoming
+    	leg proceeding leg_incoming
+    	leg connect leg_incoming
+        set legConnected true
+		set useAniAsRoom true
+        puts "\nMatch DNIS is aaPilot\n"
+        fsm setstate PLAYMAIDID
+        act_PlayMaidID
+	} else {
         set fcnt 6
         leg setupack leg_incoming
         handoff callappl leg_incoming default "DESTINATION=$dnis"
@@ -271,10 +284,10 @@ proc act_ValidateMaidID { } {
     puts "entering act_ValidateMaidID"
     puts "Digits: $maidID\n"
 
-    puts "***Ani:*** $useAniAsRoom\n"
+    puts "***using Ani as room number:*** $useAniAsRoom\n"
 
-    if { $useAniAsRoom == "1" } {
-	set roomID $ani
+    if { $useAniAsRoom == "true" } {
+	set roomID [string range $ani 0 3]
 
 	fsm setstate PLAYROOMSTATUS
 	act_PlayRoomStatus

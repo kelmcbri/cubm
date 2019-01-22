@@ -12,3 +12,7 @@ CUBM works the same with Cisco/Nortel/Avaya/whoever PBX - so there is consistenc
 If a facilities bed numbers match the last x digits of the phone number, CUBM can read the "bed number" from the callerid automatically and will not prompt the housekeeper to enter the bed number.
 CUBM does not recieve any feedback from the bed management system... it doesn't know if the data supplied by the housekeepr is legitimate.
 
+## License
+
+This project is licensed to you under the terms of the [Cisco Sample
+Code License](./LICENSE).

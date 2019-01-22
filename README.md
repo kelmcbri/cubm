@@ -1,4 +1,4 @@
-# cubm
+# cubm3 Upgrade code for newer cisco ISR4000 series routers
 Bed Management Interface
 Hospitals need to quickly clean patient rooms to turn the room over to a new patient.  They typically have some sort of bed management system to help coordinate the process of getting a room cleaned and turned over.  Sometimes, this is a manual process involving a "bed board" written on the wall.  Most hospitals are moving towards electronic versions of the bed board.
 Many legacy phone systems have a "hospitality" feature that allows a housekeeper to dial a number, input housekeeper ID, Bed#, and Cleaning Status.  Some hospitals take the output of that hospitality feature and feed it into their electronic bed management system.  Although many phone systems support hospitality, Cisco's Unified Communication Manager (CUCM)does not have a built in hospitality function.  This software is an effort to mitigate that feature gap and allow hospitals running CUCM the ability to have housekeepers enter bed status information from a phone.  

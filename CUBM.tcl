@@ -5,9 +5,9 @@
 #-------------------------------------------------------------------------
 # This version created August 15, 2013 Keller McBride
 #-------------------------------------------------------------------------
-# Description: 
+# Description:
 # This is a TCL script to create a Bed Management interface between
-# Cisco Unified Communications Manager and HCA Meditech Bed Management
+# Cisco Unified Communications Manager and Meditech Bed Management
 # This program communicates to Meditech via the Cloverleaf application
 # The program uses a protocol specified by Cloverleaf over a TCP connection.
 #
@@ -25,36 +25,36 @@
 #
 #Any additional room status sent by PBX should be ignored.
 #
-#2.	MAID ID 
+#2.	MAID ID
 #If no Maid ID is entered, PBX will send a 9999 in the Maid Id field.
 #
-#Data Layout from  PBX 
+#Data Layout from  PBX
 # Position			Field Name 		Value		Note
-# 1				Beginning Character	Start Character (02 Hex)	
-# 2-3				STATUS			ST		ST  (hard coded) Denote Status message 
-# 4				Space		
+# 1				Beginning Character	Start Character (02 Hex)
+# 2-3				STATUS			ST		ST  (hard coded) Denote Status message
+# 4				Space
 # 5-6-7-8-9-10-11-12-13-14	Room Number		XXXXXXXXXX	1-10 digits #right justified
-# 15				Space		
+# 15				Space
 # 16-17				Room Status		PR or CL	CL=cleaned; PR=cleaning in progress
-# 18				Space		
+# 18				Space
 # 19-20				MaidID to Follow	MI		Denotes Maid Id #will follow
-# 21				Space		
-# 22-23-24-25			Value for Maid Id	XXXX		Can be #1-4 digits right justified.  Not required.  If no maid id entered, #Cloverleaf will pad with generic id 9999 
-# 26				Space		
+# 21				Space
+# 22-23-24-25			Value for Maid Id	XXXX		Can be #1-4 digits right justified.  Not required.  If no maid id entered, #Cloverleaf will pad with generic id 9999
+# 26				Space
 # 27-28				TimeStamp to Follow	DS		DS Denotes Date/Time Stamp to Follow
-# 29				Space		
+# 29				Space
 # 30-31-32-33			Year			XXXX		CCYY Date/Time stamp Year
-# 34							:		
+# 34							:
 # 35-36				Month			XX		MM Date/Time stamp month
 # 37							:		Separator
 # 38-39				Day			XX		Day Date/Time Stamp Day of Month
-# 40				Space		
+# 40				Space
 # 41-42				Hour			XX		HH (valid time hour in 24 hr format)
 # 43							:		Separator
 # 44-45				Minutes			XX		MM(Valid time minutes)
 # 46							:		Separator
 # 47-48				Seconds			XX		SS Date/Time Stamp Seconds
-# 49				Ending Character	End Character 	(03 Hex)	
+# 49				Ending Character	End Character 	(03 Hex)
 #-------------------------------------------------------------------
 # Version 1.1 fixes
 # changed printf function in sendCloverleaf procedure to accept leading 0s for room number and maidID
@@ -241,35 +241,35 @@ proc act_GotDest { } {
 
 proc act_CallSetupDone { } {
     global busyPrompt
-    global legConnected 
+    global legConnected
 
     set status [infotag get evt_handoff_string]
     if { [string length $status] != 0} {
         regexp {([0-9][0-9][0-9])} $status StatusCode
-        puts "        IP IVR Disconnect Status = $status" 
+        puts "        IP IVR Disconnect Status = $status"
         switch $StatusCode {
           "016" {
               puts "        Connection success\n"
               fsm setstate CONTINUE
-              act_Cleanup 
+              act_Cleanup
           }
           default {
               if { $legConnected == "false" } {
-                  leg proceeding leg_incoming  
-                  leg connect leg_incoming  
-                  set legConnected true 
+                  leg proceeding leg_incoming
+                  leg connect leg_incoming
+                  set legConnected true
               }
               puts "        Call failed.  Play prompt and collect digit"
               if { ($StatusCode == "017") } {
                   set busyPrompt _dest_busy.au
-              } 
+              }
               act_Select
           }
-        } 
+        }
     } else {
-        puts "        Caller disconnected\n" 
-        fsm setstate CALLDISCONNECT 
-        act_Cleanup 
+        puts "        Caller disconnected\n"
+        fsm setstate CALLDISCONNECT
+        act_Cleanup
     }
 }
 
@@ -291,7 +291,7 @@ proc act_Select { } {
     set digit_collect_params(dialPlan) true
     set digit_collect_params(dialPlanTerm) true
 
-    leg collectdigits leg_incoming digit_collect_params 
+    leg collectdigits leg_incoming digit_collect_params
     if { $fcnt < $retrycnt } {
     	media play leg_incoming $busyPrompt %s500 _reenter_dest.au
         incr fcnt
@@ -408,23 +408,23 @@ proc act_SendCloverleaf { } {
 
     set currentDateTimeSeconds [clock seconds]
     set currentDateTimeString [clock format $currentDateTimeSeconds -format {%H:%M:%S}]
-    
+
     puts "        The Time from the router is :$currentDateTimeString"
     puts "        Your offset from Central Timezone is :$centralTimezoneOffset hours"
-    
+
     set currentDateTimeSeconds [expr $currentDateTimeSeconds + [expr $centralTimezoneOffset * 3600]]
     set currentDateTimeString [clock format $currentDateTimeSeconds -format {%Y:%m:%d %H:%M:%S}]
-    
+
     puts "        The DateTime to send to Cloverleaf is :$currentDateTimeString"
     puts "        This includes an offset from Central time of :$centralTimezoneOffset hours"
 
-    
+
     if { $roomStatus == 2 } {
         set roomStringStatus "CL"
     } else {
         set roomStringStatus "PR"
     }
-    
+
     if { $useTimeStamp == "TRUE" } {
         set cloverleafCommand [format "%%CUBM%% %s:%s (%cST %10s %s MI    %4s DS %s %c)" $cloverleafIP $cloverleafPort "02" $roomID $roomStringStatus $maidID $currentDateTimeString "03"]
     } else {
@@ -443,7 +443,7 @@ proc act_SayGoodbye {} {
 }
 
 requiredversion 2.0
-init 
+init
 init_ConfigVars
 #----------------------------------
 #   State Machine

@@ -15,7 +15,9 @@ Cisco has an example router script written in TCL that performs IVR (Interactive
 - If a facilities bed numbers match the last x digits of the phone number, CUBM can read the "bed number" from the callerid automatically and will not prompt the housekeeper to enter the bed number. (Housekeeper dials one number to enter bed numbers manually and another number to have the system pull the bed number automatically.
 
 ### NOTE
-- CUBM does not recieve any feedback from the bed management system... it doesn't know if the data supplied by the housekeepr is legitimate.
+- CUBM does not recieve any feedback from the bed management system... it doesn't know if the data supplied by the housekeeper is legitimate.
+- CUBM does not check to validate that the housekeeper is legitimate.
+- All the data is sent "in the clear" via a socket opened between the router and cloverleaf/meditech server. This data can be read by anyone with a network sniffer.
 
 ## License
 

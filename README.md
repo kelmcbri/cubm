@@ -1,4 +1,5 @@
-# cubm v2.4
+# cubm v2.4 [Cisco Unified Bed Management interface]
+## Phone --> PBX --> Cisco Router --> Cloverleaf/Meditech Bed Management Interface 
 ### This version can switch between providing and not providing time stamps
 - Bed Management Interface
 

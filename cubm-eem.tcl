@@ -5,7 +5,7 @@ namespace import ::cisco::lib::*
 
 # This is cubm-eem.tcl version 2
 # Mechanism has been added to meter out messages to Cloverleaf every 3 seconds
-# (There is come issue that keeps Cloverleaf from accepting messages sent close together)
+# (There is some issue that keeps Cloverleaf from accepting messages sent close together)
 
 # Query the information of latest triggered eem event
 array set arr_einfo [event_reqinfo]

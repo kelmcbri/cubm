@@ -1,9 +1,8 @@
-# Script Version: 2.4
+# Script Version: 3
 # Script Name: CUBM
 #-------------------------------------------------------------------------
 # Originally Created September 9, 2009 , Keller McBride kelmcbri@cisco.com
-#-------------------------------------------------------------------------
-# This version created August 15, 2013 Keller McBride
+#   and Marcus Butler
 #-------------------------------------------------------------------------
 # Description:
 # This is a TCL script to create a Bed Management interface between
@@ -79,36 +78,27 @@
 #	Add a variable to set whether original Nortel Hospitality format is sent to Cloverleaf or new
 #          Cisco format with timestamp added.
 #          Variable useTimeStamp with Default TRUE added to procedure init_ConfigVars
+# Version 3 Changes - Keller McBride 10/01/2019
 
 proc init { } {
-    global digit_collect_params
-    global selectCnt
-    global callInfo
     global legConnected
-
-    set digit_collect_params(interruptPrompt) true
-    set digit_collect_params(abortKey) *
-    set digit_collect_params(terminationKey) #
-    set digit_collect_params(dialPlan) true
-    set digit_collect_params(enableReporting) true
-
-    set selectCnt 0
     set legConnected false
 
-    param register aa-pilot "CUBM pilot number" "234" "s"
-    param register aa-pilot2 "CUMB pilot number ask room" "235" "s"
+    param register aa-pilot "CUBM pilot number" "1234" "s"
+    param register aa-pilot2 "CUMB pilot number ask room" "2356" "s"
     param register cloverleaf-ip "IP Address of Cloverleaf server" "127.0.0.1" "s"
     param register cloverleaf-port "Port number to access Cloverleaf server" "12345" "i"
     param register maid-id-pattern "Pattern to use to match maid ID" "...." "s"
     param register room-digits "Number of digits in room number" "10" "i"
     param register central-timezone-offset "offset in hours from central timezone" "+0" "i"
+    param register use_timestamp "Send Timestamp to Cloverleaf" "TRUE" "s"
 }
 
 proc init_ConfigVars { } {
+    puts "\nEntering procedure init_perCallvars"
     global destination
     global aaPilot
     global aaPilot2
-    global oprtr
 
     global cloverleafIP
     global cloverleafPort
@@ -118,193 +108,117 @@ proc init_ConfigVars { } {
     global centralTimezoneOffset
     global useTimeStamp
 
-# aa-pilot is the IVR number configured on the gateway - will use ANI as room number
-# aa-pilot2 is the IVR number configured on the gateway - will ask for room number
-# operator is the operator number for assisted calling
+    # aa-pilot is the IVR number configured on the gateway - will use ANI as room number
+    # aa-pilot2 is the IVR number configured on the gateway - will ask for room number
+    # operator is the operator number for assisted calling
 
-    set aaPilot [string trim [infotag get cfg_avpair aa-pilot]]
-    set aaPilot2 [string trim [infotag get cfg_avpair aa-pilot2]]
-    set cloverleafIP [string trim [infotag get cfg_avpair cloverleaf-ip]]
-    set cloverleafPort [string trim [infotag get cfg_avpair cloverleaf-port]]
-    set maidIDPattern [string trim [infotag get cfg_avpair maid-id-pattern]]
-    set roomDigits [string trim [infotag get cfg_avpair room-digits]]
+    if [infotag get cfg_avpair_exists aa-pilot] {
+        set aaPilot [string trim [infotag get cfg_avpair aa-pilot]]
+    } else {
+        set aaPilot "NONE"
+    }
+
+    if [infotag get cfg_avpair_exists aa-pilot2] {
+        set aaPilot2 [string trim [infotag get cfg_avpair aa-pilot2]]
+    } else {
+        set aaPilot2 "NONE"
+    }
+
+    if [infotag get cfg_avpair_exists cloverleaf-ip] {
+        set cloverleafIP [string trim [infotag get cfg_avpair cloverleaf-ip]]
+    } else {
+        set cloverleafIP "NONE"
+    }
+
+    if [infotag get cfg_avpair_exists cloverleaf-port] {
+        set loverleafPort [string trim [infotag get cfg_avpair cloverleaf-port]]
+    } else {
+        set loverleafPort "NONE"
+    }
+
+    if [infotag get cfg_avpair_exists maid-id-pattern] {
+        set maidIDPattern [string trim [infotag get cfg_avpair maid-id-pattern]]
+    } else {
+        set maidIDPattern "NONE"
+    }
+
+    if [infotag get cfg_avpair_exists room-digits] {
+        set roomDigits [string trim [infotag get cfg_avpair room-digits]]
+    } else {
+        set roomDigits "NONE"
+    }
+
     set roomNumPattern [string repeat "." $roomDigits]
-    set centralTimezoneOffset [string trim [infotag get cfg_avpair central-timezone-offset]]
-    set useTimeStamp "TRUE"
+
+    if [infotag get cfg_avpair_exists central-timezone-offset] {
+        set centralTimezoneOffset [string trim [infotag get cfg_avpair central-timezone-offset]]
+    } else {
+        set centralTimezoneOffset "NONE"
+    }
+
+    if [infotag get cfg_avpair_exists use_timestamp] {
+        set useTimeStamp [string trim [infotag get cfg_avpair use_timestamp]]
+    } else {
+        set useTimeStamp "TRUE"
+    }
 }
 
 proc init_perCallVars { } {
-    puts "        Entering procedure init_perCallvars"
+    puts "\n       Entering procedure init_perCallvars"
     global ani
     global anilength
     global digit_enabled
-    global fcnt
-    global retrycnt
     global dnis
     global useAniAsRoom
 
-    set fcnt 0
-    set retrycnt 6
     set ani ""
     set dnis ""
 
     set digit_enabled "FALSE"
     set ani [infotag get leg_ani]
-    puts "        The Calling ANI is: $ani"
+    puts "\n        The Calling ANI is: $ani"
     set anilength [string length $ani]
-    puts "        ANI has $anilength digits"
+    puts "\n        ANI has $anilength digits"
     set dnis [infotag get leg_dnis]
-    puts "        The called number DNIS is: $dnis"
-
+    puts "\n        The called number DNIS is: $dnis"
 }
 
 proc act_Setup { } {
-    global digit_collect_params
-    global selectCnt
-    global dest
-    global beep
-    global callInfo
     global dnis
-    global fcnt
     global aaPilot
     global aaPilot2
-    global oprtr
-    global busyPrompt
     global legConnected
     global useAniAsRoom
 
-    puts "        Entering procedure act_Setup"
-    set busyPrompt _dest_unreachable.au
-    set beep 0
+    puts "\n        Entering procedure act_Setup"
     init_perCallVars
     infotag set med_language 1
 
     if { ($dnis == "") || ($dnis == $aaPilot2) } {
         leg setupack leg_incoming
-    	leg proceeding leg_incoming
-    	leg connect leg_incoming
+     	  leg proceeding leg_incoming
+    	  leg connect leg_incoming
         set legConnected true
-        puts "        Match No DNIS or DNIS is aaPilot2"
-		set useAniAsRoom false
+        puts "\n        Match No DNIS or DNIS is aaPilot2"
+		    set useAniAsRoom false
         fsm setstate PLAYMAIDID
         act_PlayMaidID
     } elseif { ($dnis == $aaPilot) } {
-	    leg setupack leg_incoming
-    	leg proceeding leg_incoming
-    	leg connect leg_incoming
+	      leg setupack leg_incoming
+    	  leg proceeding leg_incoming
+    	  leg connect leg_incoming
         set legConnected true
-		set useAniAsRoom true
-        puts "        The Dailed number DNIS matched aaPilot: $aaPilot"
+		    set useAniAsRoom true
+        puts "\n        The Dailed number DNIS matched aaPilot: $aaPilot"
         fsm setstate PLAYMAIDID
         act_PlayMaidID
-	} else {
-        set fcnt 6
-        leg setupack leg_incoming
-        handoff callappl leg_incoming default "DESTINATION=$dnis"
-        fsm setstate HANDOFF
-   }
-}
-
-proc act_GotDest { } {
-    global dest
-    global callInfo
-    global oprtr
-    global busyPrompt
-    puts "        Entering procedure act_GotDest"
-    set status [infotag get evt_status]
-    set callInfo(alertTime) 30
-
-    if {  ($status == "cd_004") } {
-        set dest [infotag get evt_dcdigits]
-	if { $dest == "0" } {
-		set dest $oprtr
-	}
-        handoff callappl leg_incoming default "DESTINATION=$dest"
-    } elseif { ($status == "cd_001") || ($status == "cd_002") } {
-	set dest $oprtr
-        handoff callappl leg_incoming default "DESTINATION=$dest"
-    }	else {
-	if { $status == "cd_006" } {
-		set busyPrompt _dest_unreachable.au
-	}
-        puts "        Call [infotag get con_all] got event $status collecting destination"
-	set dest [infotag get evt_dcdigits]
-	if { $dest == "0" } {
-		set dest $oprtr
-		handoff callappl leg_incoming default "DESTINATION=$dest"
-	} else {
-        	act_Select
-	}
-    }
-    puts "        The destination digits entered were $dest"
-}
-
-proc act_CallSetupDone { } {
-    global busyPrompt
-    global legConnected
-
-    set status [infotag get evt_handoff_string]
-    if { [string length $status] != 0} {
-        regexp {([0-9][0-9][0-9])} $status StatusCode
-        puts "        IP IVR Disconnect Status = $status"
-        switch $StatusCode {
-          "016" {
-              puts "        Connection success\n"
-              fsm setstate CONTINUE
-              act_Cleanup
-          }
-          default {
-              if { $legConnected == "false" } {
-                  leg proceeding leg_incoming
-                  leg connect leg_incoming
-                  set legConnected true
-              }
-              puts "        Call failed.  Play prompt and collect digit"
-              if { ($StatusCode == "017") } {
-                  set busyPrompt _dest_busy.au
-              }
-              act_Select
-          }
-        }
-    } else {
-        puts "        Caller disconnected\n"
-        fsm setstate CALLDISCONNECT
-        act_Cleanup
-    }
-}
-
-proc act_Select { } {
-    global destination
-    global promptFlag2
-    global destBusy
-    global digit_collect_params
-    global fcnt
-    global retrycnt
-    global busyPrompt
-
-    puts "        Entering procedure act_Select"
-
-    set promptFlag2 0
-    set digit_collect_params(interruptPrompt) true
-    set digit_collect_params(abortKey) *
-    set digit_collect_params(terminationKey) #
-    set digit_collect_params(dialPlan) true
-    set digit_collect_params(dialPlanTerm) true
-
-    leg collectdigits leg_incoming digit_collect_params
-    if { $fcnt < $retrycnt } {
-    	media play leg_incoming $busyPrompt %s500 _reenter_dest.au
-        incr fcnt
-        fsm setstate GETROOM
-    } else {
-        act_DestBusy
-    }
+	  }
 }
 
 proc act_PlayMaidID { } {
     global digit_collect_params
     global maidIDPattern
-    puts "        Entering procedure PlayMaidID"
+    puts "\n        Entering procedure PlayMaidID"
 
     set pattern(account) $maidIDPattern
     leg collectdigits leg_incoming digit_collect_params pattern
@@ -312,6 +226,7 @@ proc act_PlayMaidID { } {
 
     fsm setstate VALIDATEMAIDID
 }
+
 proc act_ValidateMaidID { } {
     global maidID
     global useAniAsRoom
@@ -321,26 +236,26 @@ proc act_ValidateMaidID { } {
     global anilength
 
     set maidID [infotag get evt_dcdigits]
-    puts "        Entering procedure act_ValidateMaidID"
-    puts "        These were the Digits entered for maidID: $maidID"
-
-    puts "        ***using dialing number ANI as room number:*** $useAniAsRoom"
+    puts "\n        Entering procedure act_ValidateMaidID"
+    puts "\n        These were the Digits entered for maidID: $maidID"
+    puts "\n        ***using dialing number ANI as room number:*** $useAniAsRoom"
 
     if { $useAniAsRoom == "true" } {
-	set roomID [string range $ani [expr $anilength - $roomDigits ] $anilength]
-
-	fsm setstate PLAYROOMSTATUS
-	act_PlayRoomStatus
-    } else {
-	fsm setstate PLAYROOMID
-	act_PlayRoomID
-    }
+	      set roomID [string range $ani [expr $anilength - $roomDigits ] $anilength]
+	      fsm setstate PLAYROOMSTATUS
+	      act_PlayRoomStatus
+       }
+    else {
+	      fsm setstate PLAYROOMID
+	      act_PlayRoomID
+       }
 }
+
 proc act_PlayRoomID { } {
     global digit_collect_params
     global roomNumPattern
 
-    puts "         Entering procedure PlayRoomID"
+    puts "\n         Entering procedure PlayRoomID"
 
     set pattern(account) $roomNumPattern
     leg collectdigits leg_incoming digit_collect_params pattern
@@ -349,6 +264,7 @@ proc act_PlayRoomID { } {
 
     fsm setstate VALIDATEROOMID
 }
+
 proc act_ValidateRoomID { } {
     global roomID
 
@@ -360,12 +276,13 @@ proc act_ValidateRoomID { } {
 
     act_PlayRoomStatus
 }
+
 proc act_PlayRoomStatus { } {
     global digit_collect_params
     global roomID
 
-    puts "        Entering procedure PlayRoomStatus"
-    puts "        The room number being used is: $roomID"
+    puts "\n        Entering procedure PlayRoomStatus"
+    puts "\n        The room number being used is: $roomID"
 
     set pattern(account) .
     leg collectdigits leg_incoming digit_collect_params pattern
@@ -374,25 +291,23 @@ proc act_PlayRoomStatus { } {
 
     fsm setstate VALIDATEROOMSTATUS
 }
+
 proc act_ValidateRoomStatus { } {
     global roomStatus
 
     set roomStatus [infotag get evt_dcdigits]
-    puts "        Entering procedure act_ValidateRoomStatus"
-    puts "        This is the digit entered for roomStatus: $roomStatus"
+    puts "\n        Entering procedure act_ValidateRoomStatus"
+    puts "\n        This is the digit entered for roomStatus: $roomStatus"
 
     fsm setstate SENDCLOVERLEAF
 
     act_SendCloverleaf
 }
-proc act_DestBusy { } {
-    puts "        Entering procedure act_DestBusy"
-    media play leg_incoming _disconnect.au
-    fsm setstate CALLDISCONNECT
-}
+
 proc act_Cleanup { } {
     call close
 }
+
 proc act_SendCloverleaf { } {
     global cloverleafIP
     global cloverleafPort
@@ -404,19 +319,19 @@ proc act_SendCloverleaf { } {
     global centralTimezoneOffset
     global useTimeStamp
 
-    puts "        Entering Procedure sendCloverleaf"
+    puts "\n        Entering Procedure sendCloverleaf"
 
     set currentDateTimeSeconds [clock seconds]
     set currentDateTimeString [clock format $currentDateTimeSeconds -format {%H:%M:%S}]
 
-    puts "        The Time from the router is :$currentDateTimeString"
-    puts "        Your offset from Central Timezone is :$centralTimezoneOffset hours"
+    puts "\n        The Time from the router is :$currentDateTimeString"
+    puts "\n        Your offset from Central Timezone is :$centralTimezoneOffset hours"
 
     set currentDateTimeSeconds [expr $currentDateTimeSeconds + [expr $centralTimezoneOffset * 3600]]
     set currentDateTimeString [clock format $currentDateTimeSeconds -format {%Y:%m:%d %H:%M:%S}]
 
-    puts "        The DateTime to send to Cloverleaf is :$currentDateTimeString"
-    puts "        This includes an offset from Central time of :$centralTimezoneOffset hours"
+    puts "\n        The DateTime to send to Cloverleaf is :$currentDateTimeString"
+    puts "\n        This includes an offset from Central time of :$centralTimezoneOffset hours"
 
 
     if { $roomStatus == 2 } {
@@ -436,6 +351,7 @@ proc act_SendCloverleaf { } {
     fsm setstate SAYBYEBYE
     act_SayGoodbye
 }
+
 proc act_SayGoodbye {} {
     puts "        Entering Procedure act_SayGoodbye"
     media play leg_incoming _goodbye.au
@@ -450,6 +366,7 @@ init_ConfigVars
 #----------------------------------
 
 set fsm(any_state,ev_disconnected)                "act_Cleanup  same_state"
+set fsm(any_state,ev_disconnect_done)             "act_Cleanup  same_state"
 set fsm(CALL_INIT,ev_setup_indication)            "act_Setup  PLAYMAIDID"
 set fsm(PLAYMAIDID,ev_any_event)                  "act_PlayMaidID VALIDATEMAIDID"
 set fsm(VALIDATEMAIDID,ev_collectdigits_done)     "act_ValidateMaidID PLAYROOMID"
@@ -458,8 +375,7 @@ set fsm(VALIDATEROOMID,ev_collectdigits_done) 	  "act_ValidateRoomID PLAYROOMSTA
 set fsm(PLAYROOMSTATUS,ev_any_event)              "act_PlayRoomStatus VALIDATEROOMSTATUS"
 set fsm(VALIDATEROOMSTATUS,ev_collectdigits_done) "act_ValidateRoomStatus SENDCLOVERLEAF"
 set fsm(SENDCLOVERLEAF,ev_any_event)              "act_SendCloverleaf SAYBYEBYE"
-set fsm(HANDOFF,ev_returned)                      "act_CallSetupDone  CONTINUE"
-set fsm(SAYBYEBYE,ev_any_event)			  "act_SayGoodbye CALLDISCONNECT"
+set fsm(SAYBYEBYE,ev_any_event)			              "act_SayGoodbye CALLDISCONNECT"
 set fsm(CALLDISCONNECT,ev_media_done)             "act_Cleanup  same_state"
 
 fsm define fsm CALL_INIT

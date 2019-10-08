@@ -3,13 +3,13 @@
 # Script Name: its_CISCO
 # Script Lock Date: Wed Jul  2 09:22:04 2003
 #------------------------------------------------------------------
-# 
+#
 # November 27, 2001, Satish Ananthanarayana (sanantha@cisco.com)
-#         
+#
 # Modification History:
 # --------------------
 # May 20, 2008, Jasmine Kalaiselvan (jkalaise@cisco.com)
-# 
+#
 # Modified the script to do leg setup and then handovers the call
 # to Default IOS app. DDTS for this change: CSCsq35953 CSCsl08148
 #
@@ -21,25 +21,25 @@
 # Copyright (c) 2001 by cisco Systems, Inc.
 # All rights reserved.
 #------------------------------------------------------------------
-#         
-# Description: 
-#       This is a TCL IVR script for the IOS Telephony Service and 
-#       Call Manager (CM) offload scenario. The IVR script plays a 
-#       welcome prompt to the user and prompts the user to enter a 
+#
+# Description:
+#       This is a TCL IVR script for the IOS Telephony Service and
+#       Call Manager (CM) offload scenario. The IVR script plays a
+#       welcome prompt to the user and prompts the user to enter a
 #       destination number when the user dials the auto-attendant number
-#       (aa-pilot configured in the CLI). The script collects the digits that 
-#       the user has entered and hands the call to the enhanced session 
-#       application (named Default).  The session application 
+#       (aa-pilot configured in the CLI). The script collects the digits that
+#       the user has entered and hands the call to the enhanced session
+#       application (named Default).  The session application
 #       returns once there is a disconnect (if the call is established)
-#       or if a call setup problem occurs. 
-#       The operator support is also included, if the user does not dial 
-#       any number or enters "0" the user will be transfered to an operator 
-#       (if operator number is configured in the CLI). If the user enters 
-#       an invalid number, the user will be prompted again to re-enter 
+#       or if a call setup problem occurs.
+#       The operator support is also included, if the user does not dial
+#       any number or enters "0" the user will be transfered to an operator
+#       (if operator number is configured in the CLI). If the user enters
+#       an invalid number, the user will be prompted again to re-enter
 #       the number for upto 3 times before disconnecting the call.
 #
 #-------------------------------------------------------------------
-#         
+#
 
 
 proc init { } {
@@ -265,19 +265,11 @@ init_ConfigVars
 #   State Machine
 #----------------------------------
   set fsm(any_state,ev_disconnected)   "act_Cleanup  same_state"
-
   set fsm(any_state,ev_disconnect_done)   "act_Cleanup  same_state"
-
   set fsm(CALL_INIT,ev_setup_indication) "act_Setup  GETDEST"
-
   set fsm(GETDEST,ev_collectdigits_done) "act_GotDest HANDOFF"
-
   #set fsm(HANDOFF,ev_returned)   "act_CallSetupDone  CONTINUE"
-
   set fsm(HANDOFF,ev_setup_done)   "act_CallSetupDone  CONTINUE"
-
   set fsm(CALLDISCONNECT,ev_media_done) "act_Cleanup  same_state"
-
   fsm define fsm CALL_INIT
 # Script Approval Signature: C/775c
-

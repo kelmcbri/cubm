@@ -244,8 +244,7 @@ proc act_ValidateMaidID { } {
 	      set roomID [string range $ani [expr $anilength - $roomDigits ] $anilength]
 	      fsm setstate PLAYROOMSTATUS
 	      act_PlayRoomStatus
-       }
-    else {
+       } else {
 	      fsm setstate PLAYROOMID
 	      act_PlayRoomID
        }

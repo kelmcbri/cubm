@@ -81,6 +81,7 @@
 # Version 3 Changes - Keller McBride 10/01/2019
 
 proc init { } {
+    puts "\nEntering procedure init"
     global legConnected
     set legConnected false
 
@@ -110,7 +111,6 @@ proc init_ConfigVars { } {
 
     # aa-pilot is the IVR number configured on the gateway - will use ANI as room number
     # aa-pilot2 is the IVR number configured on the gateway - will ask for room number
-    # operator is the operator number for assisted calling
 
     if [infotag get cfg_avpair_exists aa-pilot] {
         set aaPilot [string trim [infotag get cfg_avpair aa-pilot]]
@@ -195,24 +195,18 @@ proc act_Setup { } {
     infotag set med_language 1
 
     if { ($dnis == "") || ($dnis == $aaPilot2) } {
-        leg setupack leg_incoming
-     	  leg proceeding leg_incoming
-    	  leg connect leg_incoming
-        set legConnected true
-        puts "\n        Match No DNIS or DNIS is aaPilot2"
+        puts "\n        Match No DNIS or DNIS matched aaPilot2: $aaPilot2"
 		    set useAniAsRoom false
-        fsm setstate PLAYMAIDID
-        act_PlayMaidID
     } elseif { ($dnis == $aaPilot) } {
-	      leg setupack leg_incoming
-    	  leg proceeding leg_incoming
-    	  leg connect leg_incoming
-        set legConnected true
 		    set useAniAsRoom true
         puts "\n        The Dailed number DNIS matched aaPilot: $aaPilot"
-        fsm setstate PLAYMAIDID
-        act_PlayMaidID
 	  }
+    leg setupack leg_incoming
+    leg proceeding leg_incoming
+    leg connect leg_incoming
+    set legConnected true
+    fsm setstate PLAYMAIDID
+    act_PlayMaidID
 }
 
 proc act_PlayMaidID { } {

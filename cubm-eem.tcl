@@ -2,7 +2,7 @@
 
 namespace import ::cisco::eem::*
 namespace import ::cisco::lib::*
-
+puts -nonewline stderr "        Entering cubm-eem process\n\r"
 # This is cubm-eem.tcl version 2 with some small comment changes
 # Mechanism has been added to meter out messages to Cloverleaf every 3 seconds
 # (There is some issue that seems to keep Cloverleaf from accepting messages sent close together)
@@ -35,16 +35,16 @@ if {[ lindex $getLastTimeSent 0 ] == "data" } {
 
 # If the current time is less than three seconds from the last message sent, wait 3 seconds
 if { [expr $nowTime - $lastTimeSent] < 3 } {
-    puts -nonewline "\r Waiting 3 seconds.\r"
+    puts -nonewline "\r Waiting 3 seconds."
     after 3000
 }
-
+puts -nonewline stderr "        Opening socket to send message to Cloverleaf\n\r"
 #Now open tcp socket and send the message to Cloverleaf
 if { [catch {set sd [socket $ip $port]}] } {
-   puts -nonewline stderr "        Connection to Cloverleaf at $ip : $port has Failed ***\n\r"
+   puts -nonewline stderr "        Connection to Cloverleaf at $ip : $port has Failed"
    exit 1
  } else {
-    puts -nonewline "\r $msg sent to Cloverleaf at $ip : $port\r"
+    puts -nonewline "      msg sent to Cloverleaf at $ip : $port"
     puts -nonewline $sd [string trim $msg]
     puts -nonewline $sd "\r"
     flush $sd

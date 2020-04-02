@@ -1,5 +1,3 @@
-
-
 !
 logging message-counter syslog
 logging buffered 4096
@@ -33,27 +31,46 @@ voice-card 0
 !
 !
 application
- service cubm flash:cubm.tcl
-! *1234 is an example phone number - change this to the phone number for your system.  Dialing this number auto-fills the room number with ANI information.
-  param aa-pilot *1234
-! 235 is an example phone number - change this to the number you will dial for manual room number entry
-  param aa-pilot2 235
+ service cubm cubm.tcl
   paramspace english index 0
+  param aa-pilot 300
   param maid-id-pattern ....
-! Change the cloverleaf-port number to be the one for your facility  
+  param use_timestamp false
+  param aa-pilot2 301
   param cloverleaf-port 10846
-! Change the cloverleaf IP address to the one for your facility
-  param cloverleaf-ip 170.150.226.10
-! Change the number of dots in room-num-pattern to represent number of digits in room number.  7 dots max.
-  param room-num-pattern É..
+  param cloverleaf-ip 192.168.16.126
+  param central-timezone-offset 0
+  param room-digits 3
  !
  monitor
   interface stats
   interface event-log
   stats
   event-log
+ !
 !
 !
+
+dial-peer voice 3000 voip
+ service cubm
+ session protocol sipv2
+ session target ipv4:192.168.16.30
+ incoming called-number 30[01]
+ dtmf-relay rtp-nte
+ codec g711ulaw
+ no vad
+!
+dial-peer voice 1 pots
+ destination-pattern 241
+ port 0/1/0
+!
+dial-peer voice 3001 voip
+ destination-pattern 30[01]
+ session protocol sipv2
+ session target ipv4:100.100.100.1
+ dtmf-relay rtp-nte
+ codec g711ulaw
+ no vad
 !
 !
 !
@@ -134,7 +151,7 @@ dial-peer voice 4000 pots
 !
 !
 !This set of connection par commands configures FXO ports to work with CUBM.  Any call coming in on one of the FXO ports
-!   gets redirected to the manual room number entry phone number.  So no matter what phone number the user dials to hit the 
+!   gets redirected to the manual room number entry phone number.  So no matter what phone number the user dials to hit the
 !  FXO port they will be redirected to the correct CUBM phone number instead.  Replace *1234 with your phone number for CUBM.
 voice-port 0/1/0
  connection plar *1234
@@ -144,14 +161,14 @@ voice-port 0/1/1
 !
 voice-port 0/1/2
  connection plar *1234
-!         
+!
 voice-port 0/1/3
  connection plar *1234
 !
 !
 !
 ! This set of commands turns on the embedded event manager which the application uses to send messages to Cloverleaf.
-scheduler allocate 20000 1000
+
 event manager directory user policy "flash:/"
 event manager policy cubm-eem.tcl
 !

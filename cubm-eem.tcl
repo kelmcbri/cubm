@@ -2,17 +2,16 @@
 
 namespace import ::cisco::eem::*
 namespace import ::cisco::lib::*
-
-# This is cubm-eem.tcl version 2
-# Mechanism has been added to meter out messages to Cloverleaf every 3 seconds
-# (There is some issue that keeps Cloverleaf from accepting messages sent close together)
+puts -nonewline stderr "        Entering cubm-eem process\n\r"
+# This is cubm-eem.tcl version 2 with some small comment changes
+# (There is some issue that seems to keep Cloverleaf from accepting messages sent close together)
 
 # Query the information of latest triggered eem event
 array set arr_einfo [event_reqinfo]
 if {$_cerrno != 0} {
     set result [format "component=%s; subsys err=%s; posix err=%s;\n%s" \
       $_cerr_sub_num $_cerr_sub_err $_cerr_posix_err $_cerr_str]
-    error $result 
+    error $result
 }
 
 set msg $arr_einfo(msg)
@@ -23,7 +22,7 @@ set port ""
 
 regexp {.*%CUBM% (.*?):(.*?) \((.*?)\)} $msg match ip port msg
 
-#Set lastTimeSnet to zero in case we haven't saved the value before and read the previous value
+#Set lastTimeSent to zero in case we haven't saved the value before and read the previous value
 set lastTimeSent 0
 set getLastTimeSent [appl_reqinfo key "showLastTimeSent"]
 set nowTime [clock seconds]
@@ -35,16 +34,16 @@ if {[ lindex $getLastTimeSent 0 ] == "data" } {
 
 # If the current time is less than three seconds from the last message sent, wait 3 seconds
 if { [expr $nowTime - $lastTimeSent] < 3 } {
-    puts -nonewline "\r Waiting 3000 seconds.\r"
+    puts -nonewline "\r Waiting 3 seconds."
     after 3000
 }
-
-#Now send the message to Cloverleaf
+puts -nonewline stderr "        Opening socket to send message to Cloverleaf\n\r"
+#Now open tcp socket and send the message to Cloverleaf
 if { [catch {set sd [socket $ip $port]}] } {
-   puts -nonewline stderr "        Connection to Cloverleaf at $ip : $port has Failed ***\n\r"
+   puts -nonewline stderr "        Connection to Cloverleaf at $ip : $port has Failed"
    exit 1
  } else {
-    puts -nonewline "\r $msg sent to Cloverleaf at $ip : $port\r"
+    puts -nonewline "      msg sent to Cloverleaf at $ip : $port"
     puts -nonewline $sd [string trim $msg]
     puts -nonewline $sd "\r"
     flush $sd

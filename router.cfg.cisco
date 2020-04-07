@@ -12,12 +12,12 @@ clock timezone CST -6
 ! Configure Daylight Savings Time if appropriate for your location
 clock summer-time CDT recurring
 !
-! Now set up NTP service to get proper time from HCAs NTP servers.
+! Now set up NTP service to get proper time from Customers NTP servers.
 ! You may want to manually set the clock on the router before implementing NTP since it takes
 !    a long time for NTP to associate with the router and converge to correct time.
 !  Manually set clock from exec prompt - not config prompt:   Router# clock set 10:50:00 Oct 26 2006
 !
-! HCA currently has 3 NTP servers - configure to all of them
+! Customer currently has 3 NTP servers - configure to all of them
 ntp server 10.26.10.100
 ntp server 10.90.10.100
 ntp server 10.154.10.100

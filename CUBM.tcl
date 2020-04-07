@@ -20,7 +20,7 @@
 #
 # Version 2.0 Changes
 #    Added central-time-offset digit-collect-paramseter to allow the router to have central timezone configured even when you want
-#    cubm to run in a different timezone.  HCA requires all network devices be managed in Central Timezone
+#    cubm to run in a different timezone.  Customer requires all network devices be managed in Central Timezone
 #    Added room-digits digit-collect-paramseter to router config.  It allows you to enter a 4 or 5 depending on the number of
 #    digits in your room numbers.#
 # Version 2.1 Changes
